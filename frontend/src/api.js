@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+// Use the Hugging Face deployed backend
+const API_BASE = 'https://hamzaboy-traffic-parking-intelligence.hf.space'
 
 const api = axios.create({
   baseURL: API_BASE,
