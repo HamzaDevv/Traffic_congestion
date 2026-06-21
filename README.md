@@ -3,6 +3,14 @@
 > AI-driven parking violation intelligence dashboard for Bengaluru.  
 > **From raw complaints → validated reports → impact scores → hotspot clusters → targeted dispatch.**
 
+---
+
+## 🌟 Live Demo (For Stakeholders)
+You don't need to run any code to view the application! The dashboard and AI models are fully deployed in the cloud.
+👉 **[View the Live Operations Dashboard](https://traffic-congestion-mauve.vercel.app/)**
+
+---
+
 ## 🏗 Architecture
 
 ```
@@ -40,18 +48,15 @@ Dashboard: http://localhost:5173
 
 ## 🌐 Deployment
 
-### Backend → Render
-
-1. Push to GitHub (models are NOT committed — too large for git)
-2. On Render: create a Web Service, Docker runtime
-3. Add a Persistent Disk at `/app/models` and upload both pkl files
-4. Set env var `MODEL_DIR=/app/models`
+### Backend → Hugging Face Spaces
+Because the ML models are large (~500MB combined), the backend is deployed on a free Hugging Face Docker Space (16GB RAM).
+1. Models are tracked via Git LFS.
+2. Space is connected to this GitHub repo and auto-builds from `backend/Dockerfile` (exposed on port 7860).
+3. **Live API**: `https://hamzaboy-traffic-parking-intelligence.hf.space`
 
 ### Frontend → Vercel
-
-1. Import the `frontend/` folder as a Vercel project
-2. Set env var `VITE_API_URL=https://your-backend.onrender.com`
-3. Deploy
+1. The `frontend/` folder is deployed directly to Vercel.
+2. It fetches data from the Hugging Face Space. If the backend is asleep, the frontend has a built-in static JSON fallback so it never breaks during a pitch.
 
 ## 🤖 3-Stage AI Pipeline
 
