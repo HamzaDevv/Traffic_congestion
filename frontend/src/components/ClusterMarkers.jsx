@@ -25,7 +25,7 @@ function vehicleIcon(vtype) {
   return '🚘'
 }
 
-export default function ClusterMarkers({ reports }) {
+export default function ClusterMarkers({ reports, cascadeStage = 4 }) {
   // Limit rendering for performance
   const visible = useMemo(() => {
     return reports.slice(0, 2500)
@@ -34,8 +34,18 @@ export default function ClusterMarkers({ reports }) {
   return (
     <>
       {visible.map((r, i) => {
-        const color = severityColor(r.severity_score)
-        const radius = 3 + r.severity_score * 5
+        let color = '#3b82f6' // Default raw color
+        let radius = 3
+        let opacity = 0.5
+
+        if (cascadeStage === 1) {
+          color = '#00e676' // Validated
+          opacity = 0.6
+        } else if (cascadeStage >= 2) {
+          color = severityColor(r.severity_score)
+          radius = 3 + r.severity_score * 5
+          opacity = 0.9
+        }
 
         return (
           <CircleMarker
@@ -45,9 +55,9 @@ export default function ClusterMarkers({ reports }) {
             pathOptions={{
               color: color,
               fillColor: color,
-              fillOpacity: 0.75,
+              fillOpacity: opacity - 0.15,
               weight: 0.5,
-              opacity: 0.9,
+              opacity: opacity,
             }}
           >
             <Popup>
@@ -68,7 +78,11 @@ export default function ClusterMarkers({ reports }) {
                   </span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5' }}>
-                  <div>Severity: <strong style={{ color }}>{(r.severity_score * 100).toFixed(0)}%</strong></div>
+                  {cascadeStage >= 2 ? (
+                    <div>Severity: <strong style={{ color }}>{(r.severity_score * 100).toFixed(0)}%</strong></div>
+                  ) : (
+                    <div>Status: <strong style={{ color }}>{cascadeStage === 1 ? 'Validated' : 'Raw Report'}</strong></div>
+                  )}
                   <div>Station: <strong style={{ color: '#e2e8f0' }}>{r.police_station || 'Unknown'}</strong></div>
                   <div>Hour: <strong style={{ color: '#e2e8f0' }}>{r.hour}:00</strong></div>
                   {r.junction_name && r.junction_name !== 'No Junction' && (

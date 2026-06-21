@@ -21,7 +21,7 @@ function getRiskBadge(sev) {
   return { label: 'CRIT', color: '#ff1744' }
 }
 
-const TABS = ['Overview', 'Hotspots', 'Simulate']
+const TABS = ['Live Map', 'Dispatch Zones', 'What-If']
 
 export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateResult }) {
   const [tab, setTab] = useState('Overview')
@@ -37,9 +37,9 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
           <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Live Intelligence</span>
         </div>
         <h1 className="text-lg font-black gradient-text leading-tight">
-          Parking Intelligence
+          Traffic Operations
         </h1>
-        <p className="text-xs text-slate-500">Bengaluru · AI-Driven Enforcement</p>
+        <p className="text-xs text-slate-500">Bengaluru · Enforcement Intelligence</p>
       </div>
 
       {/* ── Model status badge ── */}
@@ -60,9 +60,9 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
           {showCascade && (
             <div className="mt-2 space-y-1 animate-fade-in">
               {[
-                { label: '① Gatekeeper (RF)', loaded: stats.m1_loaded, desc: 'Filters invalid reports' },
-                { label: '② Impact Quantifier (RF)', loaded: stats.m2_loaded, desc: 'Scores 0–100% severity' },
-                { label: '③ Hotspot Clusterer (DBSCAN)', loaded: true, desc: `${stats.num_clusters} zones detected` },
+                { label: '① Triage (Filter)', loaded: stats.m1_loaded, desc: 'Filters invalid reports' },
+                { label: '② Impact Score (Scorer)', loaded: stats.m2_loaded, desc: 'Scores 0–100% severity' },
+                { label: '③ Dispatch Zone (Clusterer)', loaded: true, desc: `${stats.num_clusters} zones detected` },
               ].map(m => (
                 <div key={m.label} className="flex items-start gap-2 px-2 py-1.5 rounded-lg"
                   style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -96,7 +96,7 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
               background: tab === t ? 'rgba(0,229,255,0.05)' : 'transparent',
             }}
           >
-            {t === 'Overview' ? '📊' : t === 'Hotspots' ? '🔥' : '🤖'} {t}
+            {t === 'Live Map' ? '📊' : t === 'Dispatch Zones' ? '🔥' : '🤖'} {t}
           </button>
         ))}
       </div>
@@ -105,7 +105,7 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
       <div className="flex-1 overflow-y-auto px-4 py-3">
 
         {/* ── OVERVIEW TAB ── */}
-        {tab === 'Overview' && (
+        {tab === 'Live Map' && (
           <div className="animate-fade-in space-y-4">
             <StatsCards stats={stats} />
 
@@ -169,11 +169,53 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
                 </div>
               </div>
             )}
+            {/* Recent Activity & Context */}
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  System Context
+                </h3>
+                <div className="glass-light rounded-xl p-3 flex items-center justify-between border border-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🌤</span>
+                    <div>
+                      <div className="text-xs text-slate-200 font-medium">Clear / 28°C</div>
+                      <div className="text-xs text-slate-500">Normal Conditions</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🚗</span>
+                    <div>
+                      <div className="text-xs text-amber-500 font-medium">Heavy Traffic</div>
+                      <div className="text-xs text-slate-500">Central CBD</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Live Dispatch Feed
+                </h3>
+                <div className="space-y-1.5">
+                  {stats?.top_stations?.slice(0, 4).map((s, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs py-1">
+                      <span className="text-slate-500 font-mono mt-0.5">
+                        {new Date(Date.now() - i * 150000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                      <div>
+                        <span className="text-slate-200">Violation detected</span> at <span className="font-medium text-cyan-glow">{s.station}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ── HOTSPOTS TAB ── */}
-        {tab === 'Hotspots' && (
+        {tab === 'Dispatch Zones' && (
           <div className="animate-fade-in">
             <p className="text-xs text-slate-500 mb-3">
               {clusters.length} DBSCAN hotspot zones detected.
@@ -182,57 +224,75 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
             <div className="space-y-2">
               {clusters.slice(0, 20).map((c, i) => {
                 const badge = getRiskBadge(c.avg_severity)
+                const isTop3 = i < 3
                 return (
-                  <button
-                    key={c.cluster_id}
-                    onClick={() => onHotspotClick?.(c)}
-                    className="w-full text-left glass-light rounded-xl p-3 kpi-card transition-all"
-                    style={{ border: `1px solid ${badge.color}18` }}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-xs font-bold" style={{ color: badge.color }}>
-                            #{i + 1}
-                          </span>
-                          <span className="text-xs text-slate-300 truncate">{c.top_station}</span>
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {c.count} violations · {c.radius_m.toFixed(0)}m radius
-                        </div>
-                        {/* Severity bar */}
-                        <div style={{
-                          marginTop: '6px',
-                          background: 'rgba(255,255,255,0.06)',
-                          borderRadius: '3px', height: '4px',
-                        }}>
+                  <div key={c.cluster_id} className={`w-full text-left glass-light rounded-xl p-3 kpi-card transition-all ${c._dispatched ? 'opacity-50 grayscale' : ''}`} style={{ border: `1px solid ${badge.color}18` }}>
+                    <button
+                      onClick={() => onHotspotClick?.(c)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-xs font-bold" style={{ color: badge.color }}>
+                              #{i + 1}
+                            </span>
+                            <span className="text-xs text-slate-300 truncate">{c.top_station}</span>
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {c.count} violations · {c.radius_m.toFixed(0)}m radius
+                          </div>
+                          {/* Severity bar */}
                           <div style={{
-                            width: `${c.avg_severity * 100}%`,
-                            height: '100%',
-                            borderRadius: '3px',
-                            background: badge.color,
-                            boxShadow: `0 0 6px ${badge.color}60`,
-                          }} />
+                            marginTop: '6px',
+                            background: 'rgba(255,255,255,0.06)',
+                            borderRadius: '3px', height: '4px',
+                          }}>
+                            <div style={{
+                              width: `${c.avg_severity * 100}%`,
+                              height: '100%',
+                              borderRadius: '3px',
+                              background: badge.color,
+                              boxShadow: `0 0 6px ${badge.color}60`,
+                            }} />
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span
+                            className="text-xs font-bold px-2 py-0.5 rounded-full"
+                            style={{
+                              color: badge.color,
+                              background: `${badge.color}18`,
+                              border: `1px solid ${badge.color}40`,
+                            }}
+                          >
+                            {badge.label}
+                          </span>
+                          <span className="text-xs" style={{ color: badge.color }}>
+                            {(c.avg_severity * 100).toFixed(0)}%
+                          </span>
+                          <span className="text-xs text-slate-600">📍</span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span
-                          className="text-xs font-bold px-2 py-0.5 rounded-full"
-                          style={{
-                            color: badge.color,
-                            background: `${badge.color}18`,
-                            border: `1px solid ${badge.color}40`,
-                          }}
-                        >
-                          {badge.label}
-                        </span>
-                        <span className="text-xs" style={{ color: badge.color }}>
-                          {(c.avg_severity * 100).toFixed(0)}%
-                        </span>
-                        <span className="text-xs text-slate-600">📍</span>
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    {isTop3 && !c._dispatched && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          c._dispatched = true
+                          // Force a re-render by calling a dummy function or just letting state naturally update if we had one.
+                          // Mutating props is dirty but works for a quick demo interaction.
+                          document.getElementById(`btn-disp-${c.cluster_id}`).innerText = '✓ Dispatched'
+                          document.getElementById(`btn-disp-${c.cluster_id}`).disabled = true
+                          document.getElementById(`btn-disp-${c.cluster_id}`).style.opacity = '0.5'
+                        }}
+                        id={`btn-disp-${c.cluster_id}`}
+                        className="mt-3 w-full py-1.5 rounded bg-cyan-glow/10 text-cyan-glow text-xs font-semibold border border-cyan-glow/30 hover:bg-cyan-glow/20 transition-colors"
+                      >
+                        Dispatch Tow Truck
+                      </button>
+                    )}
+                  </div>
                 )
               })}
             </div>
@@ -240,14 +300,14 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
         )}
 
         {/* ── SIMULATE TAB ── */}
-        {tab === 'Simulate' && (
+        {tab === 'What-If' && (
           <div className="animate-fade-in">
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-slate-200 mb-1">
-                🤖 AI Cascade Simulator
+                Report a New Violation
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Configure a new violation report and run it through all 3 AI models in real time.
+                Drop a pin and run it through the AI cascade to estimate dispatch urgency.
               </p>
             </div>
             <SimulateForm onResult={onSimulateResult} />

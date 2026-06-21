@@ -7,13 +7,11 @@ import { useData } from './hooks/useData'
 export default function App() {
   const [hourMin, setHourMin] = useState(0)
   const [hourMax, setHourMax] = useState(23)
-  const [showHeatmap, setShowHeatmap] = useState(true)
-  const [showMarkers, setShowMarkers] = useState(true)
-  const [showClusters, setShowClusters] = useState(true)
+  const [cascadeStage, setCascadeStage] = useState(4) // 0: Raw, 1: Validated, 2: Scored, 3: Clustered, 4: Dispatched
   const [flyToTarget, setFlyToTarget] = useState(null)
   const [simulatePin, setSimulatePin] = useState(null)
 
-  const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(hourMin, hourMax)
+  const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(hourMin, hourMax, cascadeStage >= 1)
 
   const handleRangeChange = useCallback((min, max) => {
     setHourMin(min)
@@ -77,28 +75,24 @@ export default function App() {
         {/* Right — layer toggles + status */}
         <div className="flex items-center gap-3">
           {/* Layer controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center bg-black/20 rounded-full border border-white/10 p-1">
             {[
-              { key: 'heatmap', state: showHeatmap, setter: setShowHeatmap, icon: '🌡', label: 'Heat' },
-              { key: 'markers', state: showMarkers, setter: setShowMarkers, icon: '📍', label: 'Points' },
-              { key: 'clusters', state: showClusters, setter: setShowClusters, icon: '🔴', label: 'Zones' },
-            ].map(layer => (
+              { id: 0, label: 'Raw' },
+              { id: 1, label: 'Validated' },
+              { id: 2, label: 'Scored' },
+              { id: 3, label: 'Clustered' },
+              { id: 4, label: 'Dispatched' },
+            ].map(stage => (
               <button
-                key={layer.key}
-                onClick={() => layer.setter(p => !p)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200"
-                style={{
-                  background: layer.state
-                    ? 'rgba(0,229,255,0.12)'
-                    : 'rgba(255,255,255,0.04)',
-                  border: layer.state
-                    ? '1px solid rgba(0,229,255,0.3)'
-                    : '1px solid rgba(255,255,255,0.06)',
-                  color: layer.state ? '#00e5ff' : '#475569',
-                }}
+                key={stage.id}
+                onClick={() => setCascadeStage(stage.id)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                  cascadeStage >= stage.id 
+                    ? 'bg-cyan-glow/20 text-cyan-glow' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
               >
-                <span>{layer.icon}</span>
-                <span className="hidden sm:inline">{layer.label}</span>
+                {stage.label}
               </button>
             ))}
           </div>
@@ -171,9 +165,10 @@ export default function App() {
               reports={reports}
               heatmap={heatmap}
               clusters={clusters}
-              showHeatmap={showHeatmap}
-              showMarkers={showMarkers}
-              showClusters={showClusters}
+              showHeatmap={cascadeStage >= 2}
+              showMarkers={true}
+              showClusters={cascadeStage >= 3}
+              cascadeStage={cascadeStage}
               flyToTarget={flyToTarget}
               simulatePin={simulatePin}
             />

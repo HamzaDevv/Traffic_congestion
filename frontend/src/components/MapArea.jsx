@@ -37,6 +37,7 @@ export default function MapArea({
   showClusters,
   flyToTarget,
   simulatePin,
+  cascadeStage,
 }) {
   return (
     <MapContainer
@@ -60,7 +61,7 @@ export default function MapArea({
       {showHeatmap && <HeatmapLayer data={heatmap} />}
 
       {/* ── Layer 2: Individual violation markers ── */}
-      {showMarkers && <ClusterMarkers reports={reports} />}
+      {showMarkers && <ClusterMarkers reports={reports} cascadeStage={cascadeStage} />}
 
       {/* ── Layer 3: DBSCAN Hotspot Zones ── */}
       {showClusters && clusters.map((c, i) => {

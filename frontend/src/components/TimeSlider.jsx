@@ -9,7 +9,8 @@ const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => {
 export default function TimeSlider({ timeline, onRangeChange }) {
   const [currentHour, setCurrentHour] = useState(23)
   const [playing, setPlaying] = useState(false)
-  const [mode, setMode] = useState('single') // 'single' | 'all'
+  const [mode, setMode] = useState('live') // 'live' | 'playback'
+  const [speed, setSpeed] = useState(1) // 1, 2, 5
   const timerRef = useRef(null)
 
   // Report selected range to parent
@@ -24,7 +25,7 @@ export default function TimeSlider({ timeline, onRangeChange }) {
   // Playback ticker
   useEffect(() => {
     if (playing) {
-      setMode('single')
+      setMode('playback')
       timerRef.current = setInterval(() => {
         setCurrentHour(h => {
           if (h >= 23) {
@@ -33,7 +34,7 @@ export default function TimeSlider({ timeline, onRangeChange }) {
           }
           return h + 1
         })
-      }, 800)
+      }, 800 / speed)
     } else {
       clearInterval(timerRef.current)
     }
@@ -43,6 +44,10 @@ export default function TimeSlider({ timeline, onRangeChange }) {
   const togglePlay = () => {
     if (!playing && currentHour >= 23) setCurrentHour(0)
     setPlaying(p => !p)
+  }
+
+  const cycleSpeed = () => {
+    setSpeed(s => s === 1 ? 2 : s === 2 ? 5 : 1)
   }
 
   // Get violation count for hour
@@ -76,23 +81,35 @@ export default function TimeSlider({ timeline, onRangeChange }) {
 
           {/* Mode toggle */}
           <button
-            onClick={() => setMode(m => m === 'all' ? 'single' : 'all')}
+            onClick={() => {
+              setMode(m => m === 'live' ? 'playback' : 'live')
+              if (mode === 'live') setPlaying(false)
+            }}
             className="text-xs px-3 py-1 rounded-full transition-all duration-200"
             style={{
-              background: mode === 'all'
-                ? 'rgba(0, 229, 255, 0.15)'
+              background: mode === 'live'
+                ? 'rgba(0, 230, 118, 0.15)'
                 : 'rgba(255,255,255,0.04)',
-              border: mode === 'all'
-                ? '1px solid rgba(0, 229, 255, 0.4)'
+              border: mode === 'live'
+                ? '1px solid rgba(0, 230, 118, 0.4)'
                 : '1px solid rgba(255,255,255,0.08)',
-              color: mode === 'all' ? '#00e5ff' : '#64748b',
+              color: mode === 'live' ? '#00e676' : '#64748b',
             }}
           >
-            {mode === 'all' ? '🕐 All Hours' : '📍 Hourly'}
+            {mode === 'live' ? '🔴 Live Mode' : '⏪ Playback Mode'}
           </button>
 
-          <span className="text-xs text-slate-400">
-            Time-lapse — violations by hour
+          {mode === 'playback' && (
+            <button
+              onClick={cycleSpeed}
+              className="text-xs px-2 py-1 rounded border border-white/10 hover:bg-white/5 text-slate-300 transition-colors"
+            >
+              {speed}x
+            </button>
+          )}
+
+          <span className="text-xs text-slate-400 hidden sm:inline">
+            Time-lapse
           </span>
         </div>
 
@@ -123,7 +140,7 @@ export default function TimeSlider({ timeline, onRangeChange }) {
           return (
             <button
               key={h}
-              onClick={() => { setMode('single'); setCurrentHour(h); setPlaying(false) }}
+              onClick={() => { setMode('playback'); setCurrentHour(h); setPlaying(false) }}
               className="flex-1 rounded-sm transition-all duration-200"
               style={{
                 height: `${Math.max(8, heightPct)}%`,
@@ -147,12 +164,12 @@ export default function TimeSlider({ timeline, onRangeChange }) {
         max={23}
         value={currentHour}
         onChange={e => {
-          setMode('single')
+          setMode('playback')
           setCurrentHour(Number(e.target.value))
           setPlaying(false)
         }}
         className="w-full"
-        disabled={mode === 'all'}
+        disabled={mode === 'live'}
       />
 
       {/* Hour labels */}

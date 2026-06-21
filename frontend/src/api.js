@@ -4,26 +4,41 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 30000,
+  timeout: 5000,
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Helper to handle fallback on error
+async function withFallback(requestPromise, fallbackPath) {
+  try {
+    const res = await requestPromise
+    return res.data
+  } catch (err) {
+    console.warn(`[API Fallback] Backend unreachable, using snapshot for ${fallbackPath}`)
+    const fallback = await axios.get(fallbackPath)
+    return fallback.data
+  }
+}
+
 export const fetchReports = (params = {}) =>
-  api.get('/api/reports', { params }).then(r => r.data)
+  withFallback(api.get('/api/reports', { params }), '/fallback/reports.json')
 
 export const fetchHeatmap = (params = {}) =>
-  api.get('/api/heatmap', { params }).then(r => r.data)
+  withFallback(api.get('/api/heatmap', { params }), '/fallback/heatmap.json')
 
 export const fetchClusters = () =>
-  api.get('/api/clusters').then(r => r.data)
+  withFallback(api.get('/api/clusters'), '/fallback/clusters.json')
 
 export const fetchStats = () =>
-  api.get('/api/stats').then(r => r.data)
+  withFallback(api.get('/api/stats'), '/fallback/stats.json')
 
 export const fetchTimeline = () =>
-  api.get('/api/timeline').then(r => r.data)
+  withFallback(api.get('/api/timeline'), '/fallback/timeline.json')
 
-export const postSimulate = (body) =>
-  api.post('/api/simulate', body).then(r => r.data)
+export const postSimulate = async (body) => {
+  // Try backend first; if it fails, throw error as we can't reliably mock inference
+  const res = await api.post('/api/simulate', body)
+  return res.data
+}
 
 export default api
