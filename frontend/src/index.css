@@ -5,6 +5,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design System Color Tokens ── */
+
+/* Light Mode */
+:root {
+  --color-bg-page:      248 250 252;    /* #F8FAFC */
+  --color-bg-canvas:    255 255 255;    /* #FFFFFF */
+  --color-bg-card:      255 255 255;    /* #FFFFFF */
+  --color-bg-hover:     241 245 249;    /* #F1F5F9 */
+  --color-bg-border:    226 232 240;    /* #E2E8F0 */
+  --color-text-primary:   15 23 42;     /* #0F172A */
+  --color-text-secondary: 71 85 105;    /* #475569 */
+  --color-text-muted:    148 163 184;   /* #94A3B8 */
+  --color-accent-yellow: 217 119 6;     /* #D97706 */
+  --color-accent-blue:   12 115 235;    /* #0C73EB */
+  --color-accent-orange: 234 88 12;     /* #EA580C */
+  --color-risk-low:      5 150 105;     /* #059669 */
+  --color-risk-moderate: 217 119 6;     /* #D97706 */
+  --color-risk-high:     220 38 38;     /* #DC2626 */
+  --color-risk-critical: 185 28 28;     /* #B91C1C */
+}
+
+/* Dark Mode */
+.dark {
+  --color-bg-page:      8 14 26;        /* #080E1A */
+  --color-bg-canvas:    13 21 38;       /* #0D1526 */
+  --color-bg-card:      19 31 53;       /* #131F35 */
+  --color-bg-hover:     28 45 74;       /* #1C2D4A */
+  --color-bg-border:    36 54 89;       /* #243659 */
+  --color-text-primary:   240 244 255;  /* #F0F4FF */
+  --color-text-secondary: 160 170 191;  /* #A0AABF */
+  --color-text-muted:     92 108 132;   /* #5C6C84 */
+  --color-accent-yellow: 248 215 6;     /* #F8D706 */
+  --color-accent-blue:   12 115 235;    /* #0C73EB */
+  --color-accent-orange: 240 145 32;    /* #F09120 */
+  --color-risk-low:      16 185 129;    /* #10B981 */
+  --color-risk-moderate: 245 158 11;    /* #F59E0B */
+  --color-risk-high:     239 68 68;     /* #EF4444 */
+  --color-risk-critical: 220 38 38;     /* #DC2626 */
+}
+
 /* ── Base Reset ── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -19,78 +59,16 @@ html, body, #root {
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #040d1c;
-  color: #e2e8f0;
+  background-color: rgb(var(--color-bg-page));
+  color: rgb(var(--color-text-primary));
   -webkit-font-smoothing: antialiased;
 }
 
 /* ── Scrollbar Styling ── */
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.2); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,229,255,0.4); }
-
-/* ── Glass Panel ── */
-.glass {
-  background: rgba(7, 21, 41, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-}
-
-.glass-light {
-  background: rgba(255,255,255,0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-/* ── Severity Color Utilities ── */
-.severity-low    { color: #00e676; }
-.severity-mod    { color: #ffea00; }
-.severity-high   { color: #ff9100; }
-.severity-crit   { color: #ff1744; }
-
-.bg-severity-low  { background-color: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.3); }
-.bg-severity-mod  { background-color: rgba(255, 234, 0, 0.12); border: 1px solid rgba(255, 234, 0, 0.3); }
-.bg-severity-high { background-color: rgba(255, 145, 0, 0.15); border: 1px solid rgba(255, 145, 0, 0.3); }
-.bg-severity-crit { background-color: rgba(255, 23, 68, 0.15); border: 1px solid rgba(255, 23, 68, 0.3); }
-
-/* ── Glowing Borders ── */
-.border-cyan-glow { border-color: rgba(0, 229, 255, 0.4); box-shadow: 0 0 12px rgba(0, 229, 255, 0.15); }
-.border-amber-glow { border-color: rgba(255, 109, 0, 0.4); box-shadow: 0 0 12px rgba(255, 109, 0, 0.15); }
-
-/* ── Gradient Text ── */
-.gradient-text {
-  background: linear-gradient(135deg, #00e5ff 0%, #00b4d8 50%, #90e0ef 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.gradient-text-amber {
-  background: linear-gradient(135deg, #ff9100 0%, #ff6d00 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* ── KPI Card Hover ── */
-.kpi-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-}
-
-/* ── Pulse Ring Animation (for hotspot clusters) ── */
-@keyframes pulseRing {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 109, 0, 0.4); }
-  70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(255, 109, 0, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 109, 0, 0); }
-}
+::-webkit-scrollbar-track { background: rgb(var(--color-bg-page)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--color-bg-border)); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-accent-blue)); }
 
 /* ── Time Slider ── */
 input[type="range"] {
@@ -101,55 +79,53 @@ input[type="range"] {
   width: 100%;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, rgba(0,229,255,0.2), rgba(255,109,0,0.3));
+  background: rgb(var(--color-bg-border));
   height: 4px;
   border-radius: 2px;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  background: linear-gradient(135deg, #00e5ff, #00b4d8);
+  width: 16px;
+  height: 16px;
+  background: rgb(var(--color-accent-blue));
   border-radius: 50%;
-  margin-top: -7px;
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
-  transition: box-shadow 0.2s;
+  margin-top: -6px;
+  transition: background 0.2s;
 }
 input[type="range"]:hover::-webkit-slider-thumb {
-  box-shadow: 0 0 16px rgba(0, 229, 255, 0.9);
+  background: rgb(var(--color-accent-yellow));
 }
 
-/* ── Leaflet overrides for dark theme ── */
+/* ── Leaflet overrides ── */
 .leaflet-container {
-  background: #040d1c !important;
+  background: rgb(var(--color-bg-page)) !important;
   font-family: 'Inter', sans-serif !important;
 }
 .leaflet-popup-content-wrapper {
-  background: rgba(7, 21, 41, 0.95) !important;
-  border: 1px solid rgba(0, 229, 255, 0.2) !important;
-  backdrop-filter: blur(16px) !important;
-  color: #e2e8f0 !important;
+  background: rgb(var(--color-bg-card)) !important;
+  border: 1px solid rgb(var(--color-bg-border)) !important;
+  color: rgb(var(--color-text-primary)) !important;
   border-radius: 12px !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
 }
 .leaflet-popup-tip {
-  background: rgba(7, 21, 41, 0.95) !important;
+  background: rgb(var(--color-bg-card)) !important;
 }
 .leaflet-popup-close-button {
-  color: #64748b !important;
+  color: rgb(var(--color-text-muted)) !important;
 }
 .leaflet-control-attribution {
-  background: rgba(4, 13, 28, 0.8) !important;
-  color: #334155 !important;
+  background: rgb(var(--color-bg-canvas) / 0.9) !important;
+  color: rgb(var(--color-text-muted)) !important;
 }
 .leaflet-control-zoom a {
-  background: rgba(7, 21, 41, 0.9) !important;
-  color: #94a3b8 !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: rgb(var(--color-bg-canvas)) !important;
+  color: rgb(var(--color-text-secondary)) !important;
+  border: 1px solid rgb(var(--color-bg-border)) !important;
 }
 .leaflet-control-zoom a:hover {
-  background: rgba(0, 229, 255, 0.1) !important;
-  color: #00e5ff !important;
+  background: rgb(var(--color-bg-hover)) !important;
+  color: rgb(var(--color-accent-blue)) !important;
 }
 
 /* ── Fade-in Animations ── */
@@ -165,21 +141,13 @@ input[type="range"]:hover::-webkit-slider-thumb {
 }
 .animate-slide-in { animation: slideIn 0.4s ease-out; }
 
-/* ── Mesh Gradient Background ── */
-.bg-mesh {
-  background:
-    radial-gradient(ellipse at 15% 25%, rgba(0, 229, 255, 0.07) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 75%, rgba(255, 109, 0, 0.05) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 10%, rgba(0, 180, 216, 0.04) 0%, transparent 40%),
-    #040d1c;
-}
-
 /* ── Recharts overrides ── */
 .recharts-tooltip-wrapper { outline: none !important; }
 .recharts-default-tooltip {
-  background: rgba(7, 21, 41, 0.95) !important;
-  border: 1px solid rgba(0, 229, 255, 0.2) !important;
+  background: rgb(var(--color-bg-card)) !important;
+  border: 1px solid rgb(var(--color-bg-border)) !important;
   border-radius: 8px !important;
+  color: rgb(var(--color-text-primary)) !important;
 }
 
 /* ── Loading Spinner ── */
@@ -189,8 +157,8 @@ input[type="range"]:hover::-webkit-slider-thumb {
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid rgba(0, 229, 255, 0.15);
-  border-top-color: #00e5ff;
+  border: 3px solid rgb(var(--color-bg-border));
+  border-top-color: rgb(var(--color-accent-blue));
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

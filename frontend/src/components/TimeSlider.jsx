@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Play, Pause, Radio, Rewind, AlertTriangle } from 'lucide-react'
 
 const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => {
   const h = i % 12 || 12
@@ -55,28 +56,20 @@ export default function TimeSlider({ timeline, onRangeChange }) {
   const maxCount = Math.max(...(timeline.map(t => t.count) || [1]))
 
   return (
-    <div className="glass px-4 py-3 rounded-2xl">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
+    <div className="bg-bg-card border border-bg-border rounded-xl px-2.5 sm:px-4 py-2 sm:py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Play/Pause Button */}
           <button
             onClick={togglePlay}
-            className="flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200"
-            style={{
-              background: playing
-                ? 'rgba(255, 109, 0, 0.2)'
-                : 'rgba(0, 229, 255, 0.15)',
-              border: playing
-                ? '1px solid rgba(255, 109, 0, 0.5)'
-                : '1px solid rgba(0, 229, 255, 0.4)',
-              color: playing ? '#ff9100' : '#00e5ff',
-              boxShadow: playing
-                ? '0 0 12px rgba(255,109,0,0.3)'
-                : '0 0 12px rgba(0,229,255,0.2)',
-            }}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-colors ${
+              playing
+                ? 'bg-accent-orange/10 border-accent-orange/30 text-accent-orange'
+                : 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue'
+            }`}
             title={playing ? 'Pause time-lapse' : 'Play time-lapse'}
           >
-            {playing ? '⏸' : '▶'}
+            {playing ? <Pause size={16} /> : <Play size={16} />}
           </button>
 
           {/* Mode toggle */}
@@ -85,30 +78,36 @@ export default function TimeSlider({ timeline, onRangeChange }) {
               setMode(m => m === 'live' ? 'playback' : 'live')
               if (mode === 'live') setPlaying(false)
             }}
-            className="text-xs px-3 py-1 rounded-full transition-all duration-200"
-            style={{
-              background: mode === 'live'
-                ? 'rgba(0, 230, 118, 0.15)'
-                : 'rgba(255,255,255,0.04)',
-              border: mode === 'live'
-                ? '1px solid rgba(0, 230, 118, 0.4)'
-                : '1px solid rgba(255,255,255,0.08)',
-              color: mode === 'live' ? '#00e676' : '#64748b',
-            }}
+            className={`flex items-center gap-1 sm:gap-1.5 text-xs px-2 sm:px-3 py-1 rounded-lg border font-medium transition-colors ${
+              mode === 'live'
+                ? 'bg-risk-low/10 border-risk-low/30 text-risk-low'
+                : 'bg-bg-canvas border-bg-border text-text-muted hover:bg-bg-hover'
+            }`}
           >
-            {mode === 'live' ? '🔴 Live Mode' : '⏪ Playback Mode'}
+            {mode === 'live' ? (
+              <>
+                <Radio size={12} />
+                <span className="hidden sm:inline">Live Mode</span>
+                <span className="sm:hidden">Live</span>
+              </>
+            ) : (
+              <>
+                <Rewind size={12} />
+                <span className="hidden sm:inline">Playback</span>
+              </>
+            )}
           </button>
 
           {mode === 'playback' && (
             <button
               onClick={cycleSpeed}
-              className="text-xs px-2 py-1 rounded border border-white/10 hover:bg-white/5 text-slate-300 transition-colors"
+              className="text-xs px-2 py-1 rounded-lg border border-bg-border hover:bg-bg-hover text-text-secondary font-medium transition-colors"
             >
               {speed}x
             </button>
           )}
 
-          <span className="text-xs text-slate-400 hidden sm:inline">
+          <span className="text-xs text-text-muted hidden sm:inline">
             Time-lapse
           </span>
         </div>
@@ -116,11 +115,11 @@ export default function TimeSlider({ timeline, onRangeChange }) {
         {/* Current time + stats */}
         <div className="flex items-center gap-3 text-right">
           <div>
-            <div className="text-lg font-bold gradient-text leading-none">
+            <div className="text-base sm:text-lg font-medium text-accent-yellow leading-none">
               {HOUR_LABELS[currentHour]}
             </div>
             {hourData && (
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-text-muted font-mono">
                 {hourData.count} reports
               </div>
             )}
@@ -129,28 +128,23 @@ export default function TimeSlider({ timeline, onRangeChange }) {
       </div>
 
       {/* Mini timeline bar chart */}
-      <div className="flex items-end gap-0.5 h-8 mb-2">
+      <div className="flex items-end gap-px sm:gap-0.5 h-6 sm:h-8 mb-2">
         {Array.from({ length: 24 }, (_, h) => {
           const data = timeline.find(t => t.hour === h)
           const count = data ? data.count : 0
           const heightPct = maxCount > 0 ? (count / maxCount) * 100 : 0
-          const isActive = mode === 'all' || h === currentHour
           const isCurrent = h === currentHour
 
           return (
             <button
               key={h}
               onClick={() => { setMode('playback'); setCurrentHour(h); setPlaying(false) }}
-              className="flex-1 rounded-sm transition-all duration-200"
-              style={{
-                height: `${Math.max(8, heightPct)}%`,
-                background: isCurrent
-                  ? '#00e5ff'
-                  : isActive
-                    ? `rgba(0, 229, 255, ${0.2 + heightPct * 0.004})`
-                    : 'rgba(255,255,255,0.05)',
-                boxShadow: isCurrent ? '0 0 6px rgba(0,229,255,0.6)' : 'none',
-              }}
+              className={`flex-1 rounded-sm transition-all duration-200 ${
+                isCurrent
+                  ? 'bg-accent-blue'
+                  : 'bg-bg-border/50 hover:bg-bg-border'
+              }`}
+              style={{ height: `${Math.max(8, heightPct)}%` }}
               title={`${HOUR_LABELS[h]}: ${count} reports`}
             />
           )
@@ -173,7 +167,7 @@ export default function TimeSlider({ timeline, onRangeChange }) {
       />
 
       {/* Hour labels */}
-      <div className="flex justify-between text-xs text-slate-600 mt-1 px-0.5">
+      <div className="flex justify-between text-[10px] sm:text-xs text-text-muted mt-1 px-0.5">
         <span>12AM</span>
         <span>6AM</span>
         <span>12PM</span>
@@ -183,15 +177,15 @@ export default function TimeSlider({ timeline, onRangeChange }) {
 
       {/* Peak hour indicator */}
       {(currentHour >= 8 && currentHour <= 11) && (
-        <div className="mt-2 text-center text-xs font-medium"
-          style={{ color: '#ff9100' }}>
-          ⚠ Morning Peak — Highest Congestion Impact
+        <div className="mt-2 text-center text-xs font-medium text-risk-moderate flex items-center justify-center gap-1">
+          <AlertTriangle size={12} />
+          Morning Peak — Highest Congestion Impact
         </div>
       )}
       {(currentHour >= 17 && currentHour <= 19) && (
-        <div className="mt-2 text-center text-xs font-medium"
-          style={{ color: '#ffea00' }}>
-          ⚠ Evening Rush Hour
+        <div className="mt-2 text-center text-xs font-medium text-risk-moderate flex items-center justify-center gap-1">
+          <AlertTriangle size={12} />
+          Evening Rush Hour
         </div>
       )}
     </div>

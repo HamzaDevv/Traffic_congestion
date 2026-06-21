@@ -14,18 +14,19 @@ function FlyTo({ target }) {
   return null
 }
 
+// Design system risk colors (dark mode hex values)
 function getSeverityColor(score) {
-  if (score < 0.25) return '#00e676'
-  if (score < 0.5)  return '#ffea00'
-  if (score < 0.75) return '#ff9100'
-  return '#ff1744'
+  if (score < 0.25) return '#10B981' // risk-low
+  if (score < 0.5)  return '#F59E0B' // risk-moderate
+  if (score < 0.75) return '#EF4444' // risk-high
+  return '#DC2626' // risk-critical
 }
 
 function getRiskLabel(score) {
-  if (score < 0.25) return { label: 'Low Risk', cls: 'severity-low' }
-  if (score < 0.5)  return { label: 'Moderate Risk', cls: 'severity-mod' }
-  if (score < 0.75) return { label: 'High Risk', cls: 'severity-high' }
-  return { label: 'CRITICAL', cls: 'severity-crit' }
+  if (score < 0.25) return { label: 'Low Risk' }
+  if (score < 0.5)  return { label: 'Moderate Risk' }
+  if (score < 0.75) return { label: 'High Risk' }
+  return { label: 'CRITICAL' }
 }
 
 export default function MapArea({
@@ -89,7 +90,7 @@ export default function MapArea({
                   display: 'flex', justifyContent: 'space-between',
                   alignItems: 'center', marginBottom: '8px'
                 }}>
-                  <span style={{ fontWeight: '700', fontSize: '15px', color: '#e2e8f0' }}>
+                  <span style={{ fontWeight: '600', fontSize: '15px' }}>
                     Hotspot #{i + 1}
                   </span>
                   <span style={{
@@ -97,23 +98,25 @@ export default function MapArea({
                     borderRadius: '20px', color,
                     border: `1px solid ${color}40`,
                     background: `${color}18`,
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
                   }}>
                     {risk.label}
                   </span>
                 </div>
-                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.8' }}>
-                  <div>🚨 <strong style={{ color: '#e2e8f0' }}>{c.count}</strong> violations</div>
-                  <div>📊 Avg severity: <strong style={{ color }}>{(c.avg_severity * 100).toFixed(0)}%</strong></div>
-                  <div>📍 Station: <strong style={{ color: '#e2e8f0' }}>{c.top_station}</strong></div>
-                  <div>📏 Radius: <strong style={{ color: '#e2e8f0' }}>{c.radius_m.toFixed(0)}m</strong></div>
+                <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
+                  <div><strong>{c.count}</strong> violations</div>
+                  <div>Avg severity: <strong style={{ color }}>{(c.avg_severity * 100).toFixed(0)}%</strong></div>
+                  <div>Station: <strong>{c.top_station}</strong></div>
+                  <div>Radius: <strong>{c.radius_m.toFixed(0)}m</strong></div>
                 </div>
                 <div style={{
                   marginTop: '8px', padding: '6px 8px',
                   background: `${color}18`, borderRadius: '6px',
                   fontSize: '11px', color, fontWeight: '500',
                   textAlign: 'center', letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
                 }}>
-                  🚔 DISPATCH RECOMMENDED
+                  DISPATCH RECOMMENDED
                 </div>
               </div>
             </Popup>
@@ -127,20 +130,20 @@ export default function MapArea({
           center={[simulatePin.lat, simulatePin.lon]}
           radius={12}
           pathOptions={{
-            color: '#00e5ff',
-            fillColor: '#00e5ff',
+            color: '#0C73EB',
+            fillColor: '#0C73EB',
             fillOpacity: 0.3,
             weight: 2,
           }}
         >
           <Popup>
-            <div style={{ fontSize: '13px', color: '#e2e8f0', fontFamily: 'Inter, sans-serif' }}>
-              <div style={{ fontWeight: '600', marginBottom: '4px', color: '#00e5ff' }}>
+            <div style={{ fontSize: '13px', fontFamily: 'Inter, sans-serif' }}>
+              <div style={{ fontWeight: '600', marginBottom: '4px', color: '#0C73EB' }}>
                 Simulated Report
               </div>
               <div>Severity: {(simulatePin.severity * 100).toFixed(0)}%</div>
-              <div style={{ color: simulatePin.approved ? '#00e676' : '#ff1744', marginTop: '4px', fontWeight: '600' }}>
-                {simulatePin.approved ? '✓ APPROVED' : '✗ REJECTED'}
+              <div style={{ color: simulatePin.approved ? '#10B981' : '#DC2626', marginTop: '4px', fontWeight: '600' }}>
+                {simulatePin.approved ? 'APPROVED' : 'REJECTED'}
               </div>
             </div>
           </Popup>

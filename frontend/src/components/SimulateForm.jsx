@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Send, Loader2, AlertTriangle } from 'lucide-react'
 import { postSimulate } from '../api'
 
 const VEHICLE_TYPES = [
@@ -65,11 +66,11 @@ export default function SimulateForm({ onResult }) {
     }
   }
 
-  const severityColor = (score) => {
-    if (score < 0.25) return '#00e676'
-    if (score < 0.5)  return '#ffea00'
-    if (score < 0.75) return '#ff9100'
-    return '#ff1744'
+  const getSeverityTokenClass = (score) => {
+    if (score < 0.25) return 'text-risk-low bg-risk-low'
+    if (score < 0.5)  return 'text-risk-moderate bg-risk-moderate'
+    if (score < 0.75) return 'text-risk-high bg-risk-high'
+    return 'text-risk-critical bg-risk-critical'
   }
 
   return (
@@ -77,44 +78,32 @@ export default function SimulateForm({ onResult }) {
       {/* Coordinates */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-slate-400 mb-1 block">Latitude</label>
+          <label className="block text-xs font-medium uppercase tracking-widest text-text-muted mb-2">Latitude</label>
           <input
             type="number" step="0.0001"
             value={form.latitude}
             onChange={e => set('latitude', parseFloat(e.target.value))}
-            className="w-full text-xs px-2 py-1.5 rounded-lg text-slate-200"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-            }}
+            className="w-full bg-bg-canvas border border-bg-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder-text-muted focus:ring-1 focus:ring-accent-blue focus:border-accent-blue"
           />
         </div>
         <div>
-          <label className="text-xs text-slate-400 mb-1 block">Longitude</label>
+          <label className="block text-xs font-medium uppercase tracking-widest text-text-muted mb-2">Longitude</label>
           <input
             type="number" step="0.0001"
             value={form.longitude}
             onChange={e => set('longitude', parseFloat(e.target.value))}
-            className="w-full text-xs px-2 py-1.5 rounded-lg text-slate-200"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-            }}
+            className="w-full bg-bg-canvas border border-bg-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder-text-muted focus:ring-1 focus:ring-accent-blue focus:border-accent-blue"
           />
         </div>
       </div>
 
       {/* Vehicle type */}
       <div>
-        <label className="text-xs text-slate-400 mb-1 block">Vehicle Type</label>
+        <label className="block text-xs font-medium uppercase tracking-widest text-text-muted mb-2">Vehicle Type</label>
         <select
           value={form.vehicle_type}
           onChange={e => set('vehicle_type', e.target.value)}
-          className="w-full text-xs px-2 py-1.5 rounded-lg text-slate-200"
-          style={{
-            background: 'rgba(7,21,41,0.8)',
-            border: '1px solid rgba(255,255,255,0.1)',
-          }}
+          className="w-full bg-bg-canvas border border-bg-border rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-blue focus:border-accent-blue"
         >
           {VEHICLE_TYPES.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
@@ -122,9 +111,13 @@ export default function SimulateForm({ onResult }) {
 
       {/* Hour */}
       <div>
-        <label className="text-xs text-slate-400 mb-1 block">
-          Time of Day — {form.hour}:00 ({form.hour < 12 ? 'AM' : 'PM'})
-          {(form.hour >= 8 && form.hour <= 11) && <span style={{ color: '#ff9100' }}> ⚠ Peak</span>}
+        <label className="block text-xs font-medium uppercase tracking-widest text-text-muted mb-2">
+          Time of Day — <span className="font-mono">{form.hour}:00</span> ({form.hour < 12 ? 'AM' : 'PM'})
+          {(form.hour >= 8 && form.hour <= 11) && (
+            <span className="text-risk-moderate ml-1">
+              <AlertTriangle size={10} className="inline -mt-0.5" /> Peak
+            </span>
+          )}
         </label>
         <input
           type="range" min={0} max={23}
@@ -132,22 +125,18 @@ export default function SimulateForm({ onResult }) {
           onChange={e => set('hour', Number(e.target.value))}
           className="w-full"
         />
-        <div className="flex justify-between text-xs text-slate-600 mt-0.5">
+        <div className="flex justify-between text-xs text-text-muted mt-0.5">
           <span>12AM</span><span>6AM</span><span>12PM</span><span>6PM</span><span>11PM</span>
         </div>
       </div>
 
       {/* Junction */}
       <div>
-        <label className="text-xs text-slate-400 mb-1 block">Location Type</label>
+        <label className="block text-xs font-medium uppercase tracking-widest text-text-muted mb-2">Location Type</label>
         <select
           value={form.junction_name}
           onChange={e => set('junction_name', e.target.value)}
-          className="w-full text-xs px-2 py-1.5 rounded-lg text-slate-200"
-          style={{
-            background: 'rgba(7,21,41,0.8)',
-            border: '1px solid rgba(255,255,255,0.1)',
-          }}
+          className="w-full bg-bg-canvas border border-bg-border rounded-lg px-3 py-2 text-xs text-text-primary focus:ring-1 focus:ring-accent-blue focus:border-accent-blue"
         >
           {JUNCTION_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
         </select>
@@ -155,7 +144,7 @@ export default function SimulateForm({ onResult }) {
 
       {/* Violations */}
       <div>
-        <label className="text-xs text-slate-400 mb-1.5 block">Violation Types</label>
+        <label className="block text-xs font-medium uppercase tracking-widest text-text-muted mb-2">Violation Types</label>
         <div className="flex flex-wrap gap-1">
           {VIOLATION_TYPES.map(v => {
             const active = form.violation_types.includes(v)
@@ -163,12 +152,11 @@ export default function SimulateForm({ onResult }) {
               <button
                 key={v}
                 onClick={() => toggleViolation(v)}
-                className="text-xs px-2 py-0.5 rounded-full transition-all duration-150"
-                style={{
-                  background: active ? 'rgba(255,109,0,0.2)' : 'rgba(255,255,255,0.04)',
-                  border: active ? '1px solid rgba(255,109,0,0.5)' : '1px solid rgba(255,255,255,0.08)',
-                  color: active ? '#ff9100' : '#64748b',
-                }}
+                className={`text-xs px-2 py-0.5 rounded-full transition-colors border ${
+                  active
+                    ? 'bg-accent-orange/15 border-accent-orange/50 text-accent-orange'
+                    : 'bg-bg-canvas border-bg-border text-text-muted hover:bg-bg-hover'
+                }`}
               >
                 {v.replace('PARKING ', '').toLowerCase()}
               </button>
@@ -181,75 +169,72 @@ export default function SimulateForm({ onResult }) {
       <button
         onClick={submit}
         disabled={loading}
-        className="w-full py-2.5 rounded-xl font-semibold text-sm transition-all duration-200"
-        style={{
-          background: loading
-            ? 'rgba(0,229,255,0.1)'
-            : 'linear-gradient(135deg, rgba(0,229,255,0.25), rgba(0,180,216,0.2))',
-          border: '1px solid rgba(0,229,255,0.4)',
-          color: loading ? '#64748b' : '#00e5ff',
-          boxShadow: loading ? 'none' : '0 0 16px rgba(0,229,255,0.15)',
-          cursor: loading ? 'not-allowed' : 'pointer',
-        }}
+        className={`w-full py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+          loading
+            ? 'bg-bg-border text-text-muted cursor-not-allowed'
+            : 'bg-accent-yellow text-bg-canvas hover:opacity-90 cursor-pointer'
+        }`}
       >
-        {loading ? '⏳ Running AI Cascade...' : '🤖 Run 3-Stage AI Analysis'}
+        {loading ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            Running AI Cascade...
+          </>
+        ) : (
+          <>
+            <Send size={16} />
+            Run 3-Stage AI Analysis
+          </>
+        )}
       </button>
 
       {/* Error */}
       {error && (
-        <div className="text-xs text-red-400 text-center animate-fade-in">{error}</div>
+        <div className="p-4 bg-risk-critical/10 border border-risk-critical/30 rounded-xl text-sm font-medium text-risk-critical animate-fade-in">
+          {error}
+        </div>
       )}
 
       {/* Result */}
       {result && (
         <div
-          className="rounded-xl p-3 animate-fade-in"
-          style={{
-            background: result.is_approved ? 'rgba(0,230,118,0.08)' : 'rgba(255,23,68,0.08)',
-            border: `1px solid ${result.is_approved ? 'rgba(0,230,118,0.3)' : 'rgba(255,23,68,0.3)'}`,
-          }}
+          className={`rounded-xl p-3 border animate-fade-in ${
+            result.is_approved
+              ? 'bg-risk-low/10 border-risk-low/30'
+              : 'bg-risk-critical/10 border-risk-critical/30'
+          }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-sm"
-              style={{ color: result.is_approved ? '#00e676' : '#ff1744' }}>
-              {result.is_approved ? '✓ APPROVED' : '✗ REJECTED'}
+            <span className={`font-medium text-sm ${result.is_approved ? 'text-risk-low' : 'text-risk-critical'}`}>
+              {result.is_approved ? 'APPROVED' : 'REJECTED'}
             </span>
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{
-                color: severityColor(result.severity_score),
-                background: `${severityColor(result.severity_score)}18`,
-                border: `1px solid ${severityColor(result.severity_score)}40`,
-              }}
-            >
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider ${getSeverityTokenClass(result.severity_score).split(' ')[0]} ${getSeverityTokenClass(result.severity_score).split(' ')[1]}/15`}>
               {result.severity_label}
             </span>
           </div>
 
           {/* Severity bar */}
           <div className="mb-2">
-            <div className="text-xs text-slate-400 mb-1">
+            <div className="text-xs text-text-muted mb-1">
               Disruption Severity Score
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '4px', height: '6px' }}>
-              <div style={{
-                width: `${result.severity_score * 100}%`,
-                height: '100%',
-                borderRadius: '4px',
-                background: `linear-gradient(90deg, #00e676, ${severityColor(result.severity_score)})`,
-                transition: 'width 0.6s ease',
-                boxShadow: `0 0 8px ${severityColor(result.severity_score)}60`,
-              }} />
+            <div className="bg-bg-border/30 rounded-sm h-[6px]">
+              <div
+                className={`h-full rounded-sm ${getSeverityTokenClass(result.severity_score).split(' ')[1]}`}
+                style={{
+                  width: `${result.severity_score * 100}%`,
+                  transition: 'width 0.6s ease',
+                }}
+              />
             </div>
-            <div className="text-right text-xs mt-0.5"
-              style={{ color: severityColor(result.severity_score) }}>
+            <div className={`text-right text-xs mt-0.5 font-mono ${getSeverityTokenClass(result.severity_score).split(' ')[0]}`}>
               {(result.severity_score * 100).toFixed(1)}%
             </div>
           </div>
 
           {result.nearest_cluster_id !== null && (
-            <div className="text-xs text-slate-400">
-              📍 Nearest hotspot: <strong className="text-slate-200">
+            <div className="text-xs text-text-muted">
+              Nearest hotspot: <strong className="text-text-primary">
                 {(result.nearest_cluster_dist_m / 1000).toFixed(2)}km away
               </strong>
             </div>

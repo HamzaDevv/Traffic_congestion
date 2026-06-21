@@ -1,11 +1,12 @@
 import { CircleMarker, Popup } from 'react-leaflet'
 import { useMemo } from 'react'
 
+// Design system risk colors (dark mode hex values)
 function severityColor(score) {
-  if (score < 0.25) return '#00e676'
-  if (score < 0.5)  return '#ffea00'
-  if (score < 0.75) return '#ff9100'
-  return '#ff1744'
+  if (score < 0.25) return '#10B981' // risk-low
+  if (score < 0.5)  return '#F59E0B' // risk-moderate
+  if (score < 0.75) return '#EF4444' // risk-high
+  return '#DC2626' // risk-critical
 }
 
 function severityLabel(score) {
@@ -13,16 +14,6 @@ function severityLabel(score) {
   if (score < 0.5)  return 'Moderate'
   if (score < 0.75) return 'High'
   return 'Critical'
-}
-
-function vehicleIcon(vtype) {
-  const t = (vtype || '').toUpperCase()
-  if (t.includes('SCOOTER') || t.includes('MOTOR CYCLE') || t.includes('MOPED')) return '🛵'
-  if (t.includes('CAR'))     return '🚗'
-  if (t.includes('AUTO'))    return '🛺'
-  if (t.includes('BUS') || t.includes('TANKER') || t.includes('TRUCK') || t.includes('LORRY')) return '🚛'
-  if (t.includes('VAN'))     return '🚐'
-  return '🚘'
 }
 
 export default function ClusterMarkers({ reports, cascadeStage = 4 }) {
@@ -34,12 +25,12 @@ export default function ClusterMarkers({ reports, cascadeStage = 4 }) {
   return (
     <>
       {visible.map((r, i) => {
-        let color = '#3b82f6' // Default raw color
+        let color = '#0C73EB' // Default raw color (accent-blue)
         let radius = 3
         let opacity = 0.5
 
         if (cascadeStage === 1) {
-          color = '#00e676' // Validated
+          color = '#10B981' // Validated (risk-low)
           opacity = 0.6
         } else if (cascadeStage >= 2) {
           color = severityColor(r.severity_score)
@@ -62,8 +53,8 @@ export default function ClusterMarkers({ reports, cascadeStage = 4 }) {
           >
             <Popup>
               <div style={{ minWidth: '180px', fontFamily: 'Inter, sans-serif' }}>
-                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
-                  {vehicleIcon(r.vehicle_type)} {r.vehicle_type}
+                <div style={{ fontSize: '12px', marginBottom: '6px', fontWeight: '500' }}>
+                  {r.vehicle_type}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <span style={{
@@ -77,17 +68,17 @@ export default function ClusterMarkers({ reports, cascadeStage = 4 }) {
                     {severityLabel(r.severity_score)} Impact
                   </span>
                 </div>
-                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5' }}>
+                <div style={{ fontSize: '12px', lineHeight: '1.5' }}>
                   {cascadeStage >= 2 ? (
                     <div>Severity: <strong style={{ color }}>{(r.severity_score * 100).toFixed(0)}%</strong></div>
                   ) : (
                     <div>Status: <strong style={{ color }}>{cascadeStage === 1 ? 'Validated' : 'Raw Report'}</strong></div>
                   )}
-                  <div>Station: <strong style={{ color: '#e2e8f0' }}>{r.police_station || 'Unknown'}</strong></div>
-                  <div>Hour: <strong style={{ color: '#e2e8f0' }}>{r.hour}:00</strong></div>
+                  <div>Station: <strong>{r.police_station || 'Unknown'}</strong></div>
+                  <div>Hour: <strong>{r.hour}:00</strong></div>
                   {r.junction_name && r.junction_name !== 'No Junction' && (
-                    <div style={{ color: '#ff9100', marginTop: '4px', fontSize: '11px' }}>
-                      ⚠ Junction violation
+                    <div style={{ color: '#F59E0B', marginTop: '4px', fontSize: '11px', fontWeight: '500' }}>
+                      Junction violation
                     </div>
                   )}
                 </div>

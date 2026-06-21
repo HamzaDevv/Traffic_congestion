@@ -4,44 +4,36 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       colors: {
-        navy: {
-          900: '#040d1c',
-          800: '#071529',
-          700: '#0a1f3d',
-          600: '#0d2952',
+        bg: {
+          page:   'rgb(var(--color-bg-page) / <alpha-value>)',
+          canvas: 'rgb(var(--color-bg-canvas) / <alpha-value>)',
+          card:   'rgb(var(--color-bg-card) / <alpha-value>)',
+          hover:  'rgb(var(--color-bg-hover) / <alpha-value>)',
+          border: 'rgb(var(--color-bg-border) / <alpha-value>)',
         },
-        cyan: {
-          glow: '#00e5ff',
-          soft: '#00b4d8',
+        text: {
+          primary:   'rgb(var(--color-text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--color-text-secondary) / <alpha-value>)',
+          muted:     'rgb(var(--color-text-muted) / <alpha-value>)',
         },
-        amber: {
-          glow: '#ff6d00',
-          soft: '#ffa040',
+        accent: {
+          yellow: 'rgb(var(--color-accent-yellow) / <alpha-value>)',
+          blue:   'rgb(var(--color-accent-blue) / <alpha-value>)',
+          orange: 'rgb(var(--color-accent-orange) / <alpha-value>)',
         },
-        severity: {
-          low: '#00e676',
-          moderate: '#ffea00',
-          high: '#ff9100',
-          critical: '#ff1744',
-        }
-      },
-      backgroundImage: {
-        'mesh-gradient': 'radial-gradient(at 20% 30%, rgba(0,229,255,0.08) 0px, transparent 50%), radial-gradient(at 80% 70%, rgba(255,109,0,0.06) 0px, transparent 50%)',
-      },
-      boxShadow: {
-        'glass': '0 8px 32px rgba(0, 0, 0, 0.4)',
-        'glass-sm': '0 4px 16px rgba(0, 0, 0, 0.3)',
-        'cyan-glow': '0 0 20px rgba(0, 229, 255, 0.3)',
-        'amber-glow': '0 0 20px rgba(255, 109, 0, 0.3)',
-      },
-      backdropBlur: {
-        xs: '2px',
+        risk: {
+          low:      'rgb(var(--color-risk-low) / <alpha-value>)',
+          moderate: 'rgb(var(--color-risk-moderate) / <alpha-value>)',
+          high:     'rgb(var(--color-risk-high) / <alpha-value>)',
+          critical: 'rgb(var(--color-risk-critical) / <alpha-value>)',
+        },
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

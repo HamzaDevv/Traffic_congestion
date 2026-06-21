@@ -3,12 +3,12 @@ import { useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet.heat'
 
-// Severity-based gradient: green (low) → yellow → orange → red (critical)
+// Design system risk token colors for heatmap gradient
 const HEAT_GRADIENT = {
-  0.0: '#00e676',
-  0.3: '#ffea00',
-  0.6: '#ff9100',
-  1.0: '#ff1744',
+  0.0: '#10B981', // risk-low
+  0.3: '#F59E0B', // risk-moderate
+  0.6: '#EF4444', // risk-high
+  1.0: '#DC2626', // risk-critical
 }
 
 export default function HeatmapLayer({ data }) {
