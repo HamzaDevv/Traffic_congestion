@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Model files (too large for GitHub — upload to Render persistent disk)
+backend/models/*.pkl
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
