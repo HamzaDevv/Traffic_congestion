@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: parking-backend
+    env: docker
+    region: oregon # Or your preferred region
+    plan: starter # 512MB RAM might be too little for 500MB of models. Standard (2GB) is recommended, but let's try the free tier first and scale up if OOM.
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: PORT
+        value: 8000
+    healthCheckPath: /health
