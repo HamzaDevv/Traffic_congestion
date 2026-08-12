@@ -356,8 +356,7 @@ export default function App() {
   }, [handleDispatchTowTruck])
 
   const handleRangeChange = useCallback((min, max) => {
-    setHourMin(min)
-    setHourMax(max)
+    setHistoricalFilters(prev => ({ ...prev, hourMin: min, hourMax: max }))
   }, [])
 
   // Trigger Stage 4 RL SOP Evaluation on hotspot click
