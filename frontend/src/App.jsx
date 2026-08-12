@@ -723,7 +723,7 @@ export default function App() {
               clusters={clusters}
               showHeatmap={viewMode === 'HISTORICAL' && historicalFilters.showHeatmap}
               showMarkers={viewMode === 'HISTORICAL'}
-              showClusters={cascadeStage >= 3}
+              showClusters={viewMode === 'HISTORICAL' && cascadeStage >= 3}
               cascadeStage={cascadeStage}
               flyToTarget={flyToTarget}
               simulatePin={simulatePin}
