@@ -12,6 +12,7 @@ import json
 import pickle
 import warnings
 import logging
+from typing import Any
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -159,6 +160,16 @@ class AppState:
     timeline: list[dict] = []
     m1_loaded: bool = False
     m2_loaded: bool = False
+
+    # 15-Day Live Stream Simulation State
+    live_stream_df: pd.DataFrame = None
+    live_stream_records: list[dict] = []
+    live_stream_index: int = 0
+    live_stream_running: bool = True
+    live_stream_speed: int = 10           # Multiplier (1x, 10x, 60x, 300x)
+    live_stream_start_dt: Any = None
+    live_stream_end_dt: Any = None
+    live_stream_simulated_now: Any = None
 
 state = AppState()
 
@@ -309,6 +320,28 @@ def load_and_process():
         }
         for _, row in timeline_data.iterrows()
     ]
+
+    # 10. Prepare 15-Day Live Stream Complaints Queue
+    try:
+        parsed_dates = pd.to_datetime(df["created_datetime"], format="mixed")
+        max_dt = parsed_dates.max()
+        cutoff_dt = max_dt - pd.Timedelta(days=15)
+        mask_15d = parsed_dates >= cutoff_dt
+
+        live_df = scored[mask_15d].copy()
+        live_df["created_datetime"] = parsed_dates[mask_15d].astype(str)
+        live_df = live_df.sort_values("created_datetime").reset_index(drop=True)
+
+        state.live_stream_df = live_df
+        state.live_stream_records = live_df.to_dict(orient="records")
+        state.live_stream_index = 0
+        state.live_stream_start_dt = str(cutoff_dt)
+        state.live_stream_end_dt = str(max_dt)
+        state.live_stream_simulated_now = str(cutoff_dt)
+        logger.info(f"Loaded {len(state.live_stream_records)} complaints for 15-day live stream ({cutoff_dt} to {max_dt})")
+    except Exception as e:
+        logger.error(f"Failed to prepare 15-day live stream: {e}")
+        state.live_stream_records = []
 
     logger.info("=== Data loading complete ===")
 

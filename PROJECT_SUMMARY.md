@@ -14,6 +14,7 @@ The **Smart City Parking Intelligence & Autonomous Dispatch System** transforms 
 2. **Stage 2 (Impact Quantifier ML)**: Assigns a continuous severity score ($0.0 - 1.0$) based on vehicle weight, location type, peak hour, and traffic disruption potential.
 3. **Stage 3 (Hotspot Clusterer DBSCAN)**: Groups approved high-severity violations into dispatch-ready spatial clusters (80m radii centroids).
 4. **Stage 4 (Autonomous RL SOP Dispatcher - `Qwen 2.5 0.5B`)**: Evaluates live incident telemetry, executes 5 real-time agentic tools (including Dijkstra graph routing and Green Corridor signal overrides), executes routine decisions autonomously ($P \ge 0.80$), and triggers a Human-in-the-Loop (HITL) Officer Override Modal for continuous DPO alignment.
+5. **Real-time Live Stream & Instant Query Engine**: Slices the final 15 days of dataset complaints into a real-time streaming queue with auto-looping reset, complete with a single-click **`⚡ Live Simulate Query`** trigger for immediate live request handling demonstrations.
 
 ---
 

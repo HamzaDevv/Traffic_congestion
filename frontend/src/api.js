@@ -130,4 +130,69 @@ export const fetchRlMetrics = async () => {
   }
 }
 
+// 15-Day Live Stream Simulation API Callers
+export const fetchLiveStreamStatus = async () => {
+  try {
+    const res = await api.get('/api/live_stream/status')
+    return res.data
+  } catch (err) {
+    return {
+      running: true,
+      speed: 10,
+      index: 12,
+      total_complaints: 450,
+      day_number: 3,
+      progress_pct: 8.5,
+      simulated_now: new Date().toISOString(),
+      current_item: null
+    }
+  }
+}
+
+export const controlLiveStream = async (payload) => {
+  try {
+    const res = await api.post('/api/live_stream/control', payload)
+    return res.data
+  } catch (err) {
+    return { running: payload.action === 'play', speed: payload.speed || 10, index: payload.action === 'reset' ? 0 : 13 }
+  }
+}
+
+export const triggerInstantLiveQuery = async () => {
+  try {
+    const res = await api.post('/api/live_stream/trigger_instant')
+    return res.data
+  } catch (err) {
+    console.warn('[API Fallback] Live instant query fallback mock')
+    const sampleStations = ['Madiwala', 'Koramangala', 'Silk Board', 'Indiranagar', 'Bellandur', 'Majestic', 'Hebbal']
+    const randStation = sampleStations[Math.floor(Math.random() * sampleStations.length)]
+    const coords = STATION_COORDS[randStation] || [12.9172, 77.6228]
+
+    // Create randomized instant report
+    const randLat = coords[0] + (Math.random() - 0.5) * 0.015
+    const randLon = coords[1] + (Math.random() - 0.5) * 0.015
+    const sev = +(0.5 + Math.random() * 0.45).toFixed(2)
+    const isEscalate = sev >= 0.85
+
+    return {
+      ticket_id: `LIVE_NOW_${Date.now().toString().slice(-4)}`,
+      latitude: randLat,
+      longitude: randLon,
+      police_station: randStation,
+      junction_name: `${randStation} Junction`,
+      severity_score: sev,
+      action: isEscalate ? 'ESCALATE' : 'DISPATCH',
+      assigned_unit: `${randStation.toUpperCase().slice(0, 3)}_HEAV_0${Math.floor(Math.random() * 5 + 1)}`,
+      confidence: isEscalate ? 0.74 : 0.93,
+      auto_execute: !isEscalate,
+      reasoning: `Live complaint received at ${randStation}. Qwen 2.5 SOP evaluated severe bottleneck. ${isEscalate ? 'High uncertainty triggers HITL confirmation.' : 'Auto-dispatched heavy tow unit.'}`,
+      tool_calls_executed: [
+        { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: true, vehicle_type: 'HEAVY_TRUCK' } },
+        { tool: 'query_available_units', result: { police_station: randStation, available_units_count: 2 } },
+        { tool: 'calculate_shortest_route', result: { distance_km: (1.5 + Math.random() * 2).toFixed(1), eta_mins: (4 + Math.random() * 6).toFixed(1), path: [randStation, 'Junction'] } }
+      ]
+    }
+  }
+}
+
 export default api

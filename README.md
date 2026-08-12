@@ -52,6 +52,16 @@ graph TD
    - Displays real-time tool traces (`check_junction_cctv`, `query_available_units`, `calculate_shortest_route`, `issue_signal_override`, `broadcast_traffic_advisory`).
    - Formats Dijkstra road graph node chains (e.g. `Madiwala ➔ Silk Board ➔ HSR Layout`) and signal priority timers.
 
+4. **📻 15-Day Live Complaints Stream Simulation Engine (`LiveStreamBar.jsx`)**:
+   - Continuously streams complaints from the final 15 days of dataset records (`2024-03-24` to `2024-04-08`).
+   - Automatically loops back to Day 1 once the 15-day timeframe concludes.
+   - Interactive playback bar with speed multipliers (`1x`, `10x`, `60x`, `300x`), play/pause toggle, and reset controls.
+
+5. **⚡ Instant Live Query Handling Button (`⚡ Live Simulate Query`)**:
+   - Instantly pulls the next pending complaint from the live queue right now.
+   - Executes the 4-Stage cascade analysis (Gatekeeper → Quantifier → Clusterer → Qwen RL SOP Dispatcher).
+   - Pans/flies the Leaflet map to the incident spot, displays real-time tool execution logs, and dispatches a heavy tow truck or opens the HITL review portal.
+
 ---
 
 ## 🛠️ Stage 4: Agentic Tools Suite

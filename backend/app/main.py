@@ -243,6 +243,115 @@ def simulate(req: SimulateRequest):
 
 
 # ---------------------------------------------------------------------------
+# 15-Day Live Complaints Stream Simulation Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/live_stream/status")
+def get_live_stream_status():
+    """Return status of 15-day live complaints stream simulation."""
+    total = len(state.live_stream_records)
+    if total == 0:
+        return {
+            "running": False,
+            "speed": state.live_stream_speed,
+            "index": 0,
+            "total_complaints": 0,
+            "day_number": 1,
+            "progress_pct": 0.0,
+            "simulated_now": None,
+            "current_item": None,
+        }
+
+    idx = state.live_stream_index % total
+    curr_item = state.live_stream_records[idx]
+
+    progress_pct = round((idx / total) * 100, 1)
+    day_number = min(15, max(1, int((idx / total) * 15) + 1))
+    simulated_now = curr_item.get("created_datetime", state.live_stream_start_dt)
+
+    return {
+        "running": state.live_stream_running,
+        "speed": state.live_stream_speed,
+        "index": idx,
+        "total_complaints": total,
+        "day_number": day_number,
+        "progress_pct": progress_pct,
+        "simulated_now": simulated_now,
+        "start_dt": state.live_stream_start_dt,
+        "end_dt": state.live_stream_end_dt,
+        "current_item": curr_item,
+    }
+
+
+@app.post("/api/live_stream/control")
+def control_live_stream(payload: dict):
+    """Control live stream playback: play, pause, reset, set_speed, or next_step."""
+    action = payload.get("action", "")
+    speed = payload.get("speed")
+
+    if speed is not None:
+        state.live_stream_speed = int(speed)
+
+    if action == "play":
+        state.live_stream_running = True
+    elif action == "pause":
+        state.live_stream_running = False
+    elif action == "reset":
+        state.live_stream_index = 0
+    elif action == "next_step":
+        if state.live_stream_records:
+            state.live_stream_index = (state.live_stream_index + 1) % len(state.live_stream_records)
+
+    return get_live_stream_status()
+
+
+@app.post("/api/live_stream/trigger_instant")
+def trigger_instant_live_query():
+    """
+    Simulate incoming complaint right now from the 15-day live queue.
+    Advances the queue by 1 step (auto-resets to 0 when 15 days finish),
+    runs the 4-Stage cascade analysis, and returns the live prediction with tool logs.
+    """
+    total = len(state.live_stream_records)
+    if total == 0:
+        curr_item = {
+            "id": f"SIM_{state.live_stream_index}",
+            "latitude": 12.9172,
+            "longitude": 77.6228,
+            "police_station": "Madiwala",
+            "junction_name": "Silk Board Junction",
+            "vehicle_type": "BUS",
+            "severity_score": 0.88,
+        }
+    else:
+        idx = state.live_stream_index % total
+        curr_item = state.live_stream_records[idx]
+        state.live_stream_index = (state.live_stream_index + 1) % total
+
+    ticket_id = f"LIVE_{curr_item.get('id', '999')}_{state.live_stream_index}"
+    req = PredictActionRequest(
+        ticket_id=ticket_id,
+        latitude=float(curr_item.get("latitude", 12.9172)),
+        longitude=float(curr_item.get("longitude", 77.6228)),
+        police_station=str(curr_item.get("police_station", "Madiwala")),
+        junction_name=str(curr_item.get("junction_name", "Silk Board Junction")),
+        severity_score=float(curr_item.get("severity_score", 0.75)),
+        report_count=1,
+    )
+
+    prediction_resp = predict_action(req)
+
+    res_dict = prediction_resp.model_dump()
+    res_dict["created_datetime"] = curr_item.get("created_datetime", "Just Now")
+    res_dict["vehicle_type"] = curr_item.get("vehicle_type", "CAR")
+    res_dict["stream_index"] = state.live_stream_index
+    res_dict["day_number"] = min(15, max(1, int((state.live_stream_index / max(1, total)) * 15) + 1))
+    res_dict["loop_reset_occurred"] = (state.live_stream_index == 0)
+
+    return res_dict
+
+
+# ---------------------------------------------------------------------------
 # Stage 4: Qwen 2.5 RL SOP Dispatcher & HITL Feedback Endpoints
 # ---------------------------------------------------------------------------
 

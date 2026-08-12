@@ -5,8 +5,9 @@ import Sidebar from './components/Sidebar'
 import TimeSlider from './components/TimeSlider'
 import HitlOverrideModal from './components/HitlOverrideModal'
 import ToolExecutionLog from './components/ToolExecutionLog'
+import LiveStreamBar from './components/LiveStreamBar'
 import { useData } from './hooks/useData'
-import { predictAction, postHumanFeedback, fetchRlMetrics, STATION_COORDS, generateDijkstraWaypoints } from './api'
+import { predictAction, postHumanFeedback, fetchRlMetrics, STATION_COORDS, generateDijkstraWaypoints, fetchLiveStreamStatus, controlLiveStream, triggerInstantLiveQuery } from './api'
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
@@ -138,10 +139,55 @@ export default function App() {
   const [activeTrucks, setActiveTrucks] = useState([])
   const animFrameRef = useRef(null)
 
+  // 15-Day Live Stream Simulation States
+  const [streamStatus, setStreamStatus] = useState({
+    running: true,
+    speed: 10,
+    index: 0,
+    total_complaints: 450,
+    day_number: 1,
+    progress_pct: 0,
+    simulated_now: null,
+  })
+  const [isProcessingInstant, setIsProcessingInstant] = useState(false)
+
   const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(hourMin, hourMax, cascadeStage >= 1)
 
   useEffect(() => {
     fetchRlMetrics().then(data => setRlMetrics(data)).catch(() => {})
+    fetchLiveStreamStatus().then(st => setStreamStatus(st)).catch(() => {})
+  }, [])
+
+  // Stream tick interval scales according to speed multiplier
+  useEffect(() => {
+    if (!streamStatus.running) return
+
+    const pollIntervalMs = Math.max(1500, Math.floor(4000 / (streamStatus.speed || 10)))
+    const interval = setInterval(async () => {
+      try {
+        const nextSt = await controlLiveStream({ action: 'next_step' })
+        setStreamStatus(nextSt)
+      } catch (e) {
+        console.warn('Live stream tick error:', e)
+      }
+    }, pollIntervalMs)
+
+    return () => clearInterval(interval)
+  }, [streamStatus.running, streamStatus.speed])
+
+  const handleToggleStreamPlay = useCallback(async () => {
+    const nextSt = await controlLiveStream({ action: streamStatus.running ? 'pause' : 'play' })
+    setStreamStatus(nextSt)
+  }, [streamStatus.running])
+
+  const handleResetStream = useCallback(async () => {
+    const nextSt = await controlLiveStream({ action: 'reset' })
+    setStreamStatus(nextSt)
+  }, [])
+
+  const handleChangeStreamSpeed = useCallback(async (newSpeed) => {
+    const nextSt = await controlLiveStream({ speed: newSpeed })
+    setStreamStatus(nextSt)
   }, [])
 
   // Auto-seed initial queue items from fetched DBSCAN clusters if available
@@ -250,6 +296,53 @@ export default function App() {
     setActiveTrucks(prev => [...prev.filter(t => t.ticket_id !== newTruck.ticket_id), newTruck])
     setFlyToTarget({ lat: targetLat, lon: targetLon })
   }, [])
+
+  // User requested function: Live Simulate Query Button Trigger
+  const handleTriggerInstantLiveQuery = useCallback(async () => {
+    setIsProcessingInstant(true)
+    try {
+      const liveRes = await triggerInstantLiveQuery()
+      if (liveRes) {
+        const newItem = {
+          ticket_id: liveRes.ticket_id || `LIVE_${Date.now()}`,
+          police_station: liveRes.police_station || 'Madiwala',
+          junction_name: liveRes.junction_name || 'Silk Board Junction',
+          latitude: liveRes.latitude,
+          longitude: liveRes.longitude,
+          severity_score: liveRes.severity_score || 0.85,
+          action: liveRes.action || 'DISPATCH',
+          confidence: liveRes.confidence || 0.88,
+          auto_execute: liveRes.auto_execute !== undefined ? liveRes.auto_execute : true,
+          reasoning: liveRes.reasoning || 'Live complaint received and handled instantly by Qwen 2.5 SOP pipeline.',
+          status: (!liveRes.auto_execute || liveRes.action === 'ESCALATE') ? 'PENDING' : 'AUTONOMOUS',
+          tool_calls_executed: liveRes.tool_calls_executed || [],
+        }
+
+        // Add to top of queue
+        setQueueItems(prev => [newItem, ...prev])
+        setActivePrediction(newItem)
+
+        // Fly map view directly to incident spot
+        if (newItem.latitude && newItem.longitude) {
+          setFlyToTarget({ lat: newItem.latitude, lon: newItem.longitude })
+        }
+
+        // Trigger heavy tow truck dispatch or open HITL modal
+        if (newItem.action === 'DISPATCH') {
+          handleDispatchTowTruck(newItem)
+        } else if (newItem.action === 'ESCALATE' || !newItem.auto_execute) {
+          setHitlModalOpen(true)
+        }
+      }
+
+      const updatedSt = await fetchLiveStreamStatus()
+      setStreamStatus(updatedSt)
+    } catch (err) {
+      console.error('Instant live query simulation failed:', err)
+    } finally {
+      setIsProcessingInstant(false)
+    }
+  }, [handleDispatchTowTruck])
 
   const handleRangeChange = useCallback((min, max) => {
     setHourMin(min)
@@ -525,6 +618,16 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        {/* ── 15-Day Live Complaints Streaming Bar ── */}
+        <LiveStreamBar
+          streamStatus={streamStatus}
+          onTogglePlay={handleToggleStreamPlay}
+          onReset={handleResetStream}
+          onChangeSpeed={handleChangeStreamSpeed}
+          onTriggerInstantQuery={handleTriggerInstantLiveQuery}
+          isProcessingInstant={isProcessingInstant}
+        />
 
         {/* ── Main Content Area ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
