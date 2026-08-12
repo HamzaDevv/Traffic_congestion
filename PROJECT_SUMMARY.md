@@ -127,12 +127,14 @@ The **Smart City Parking Intelligence & Autonomous Dispatch System** transforms 
 * **Softmax Confidence Gating**: Calculates prediction confidence $P$. If $P \ge 0.80$ and action $\neq \text{ESCALATE}$, the action executes autonomously. If $P < 0.80$ or action $= \text{ESCALATE}$, the system invokes the HITL Officer Override Modal.
 
 ### F. Human-in-the-Loop (HITL) Continuous Alignment & DPO
-* **Officer Override Modal**: Displays Qwen's recommendation, executed tool traces, Dijkstra route ETA, and confidence score. Offers 1-click approval or manual action override (`VERIFY`, `DISPATCH`, `RESOLVE`, `REJECT`, `ESCALATE`).
+* **HITL Review Queue Stream (`HitlQueuePanel.jsx`)**: Dedicated sidebar panel & top navbar launcher filtering queries by status (`Pending HITL Review`, `Autonomous Executed`). Displays Softmax confidence %, Qwen reasoning quotes, executed agentic tool pills, and 1-click Quick Approve or Manual Override triggers.
+* **Officer Override Modal (`HitlOverrideModal.jsx`)**: Displays Qwen's recommendation, executed tool traces, Dijkstra route ETA, and confidence score. Offers 1-click approval or manual action override (`VERIFY`, `DISPATCH`, `RESOLVE`, `REJECT`, `ESCALATE`).
 * **Continuous DPO Pipeline (`periodic_dpo_retrain.py`)**: Officer overrides generate Direct Preference Optimization (DPO) preference pairs (`chosen` vs `rejected`) stored in `dpo_preference_pairs.jsonl`. Micro-tuning loops align Qwen 2.5 with live human officer judgment.
 
-### G. Full-Stack Application Infrastructure
+### G. Full-Stack Application Infrastructure & Tow Truck Map Dispatches
 * **FastAPI Backend (`backend/app/main.py`)**: Serves 8 REST endpoints (`/api/stats`, `/api/reports`, `/api/heatmap`, `/api/clusters`, `/api/simulate`, `/api/predict_action`, `/api/human_feedback`, `/api/rl_metrics`). Live backend hosted on Hugging Face Spaces (`https://hamzaboy-traffic-parking-intelligence.hf.space`).
 * **React + Leaflet Dashboard (`frontend/`)**: Renders violation markers, heatmap layers, DBSCAN hotspot overlays, hourly timeline slider ($00:00 - 23:00$), station analytics, dark/light theme toggle, live simulation panel, and tool execution logs. Live frontend deployed on Vercel (`https://traffic-congestion-mauve.vercel.app/`).
+* **Animated Tow Truck Fleet Layer (`TowTruckMarkers.jsx`)**: Spawns animated Tow Truck and Patrol Interceptor Leaflet markers, draws glowing Dijkstra Green Corridor route polylines, and smoothly animates real-time unit movement from police station origin to the target incident location.
 
 ---
 

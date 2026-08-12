@@ -2,7 +2,7 @@
 
 Bengaluru's traffic command centers receive thousands of citizen-submitted traffic and parking violation reports daily. Most are unvalidated, unscored, and spatially unorganised, making targeted dispatch and enforcement nearly impossible.
 
-**Traffic Intelligence** solves this with a **4-Stage AI & Reinforcement Learning Cascade** deployed as a full-stack real-time operational dashboard. Raw citizen reports are ingested, validated by a Gatekeeper, scored for impact severity, clustered into hotspot zones, and dispatched by an autonomous **Tool-Augmented RL SOP Policy** based on `Qwen2.5-0.5B-Instruct` equipped with **Dijkstra Shortest Path Routing** and a **Human-in-the-Loop (HITL) Continuous Alignment Loop**.
+**Traffic Intelligence** solves this with a **4-Stage AI & Reinforcement Learning Cascade** deployed as a full-stack real-time operational dashboard. Raw citizen reports are ingested, validated by a Gatekeeper, scored for impact severity, clustered into hotspot zones, and dispatched by an autonomous **Tool-Augmented RL SOP Policy** based on `Qwen2.5-0.5B-Instruct` equipped with **Dijkstra Shortest Path Routing**, **Animated Tow Truck Map Dispatches**, a **Dedicated HITL Review Queue**, and a **Human-in-the-Loop (HITL) Continuous Alignment Loop**.
 
 ---
 
@@ -25,13 +25,32 @@ graph TD
     D -->|"severity_score (0.0 - 1.0)"| E["Stage 3: Hotspot Clusterer (DBSCAN Haversine)"]:::cluster
     E -->|"Cluster Centroids & Telemetry"| F["Stage 4: RL Qwen 2.5 SOP Policy"]:::rl
 
-    F -->|"Softmax Gate P >= 0.80"| G["Autonomous Action Execution"]:::api
-    F -->|"Softmax Gate P < 0.80 or ESCALATE"| H["HITL Officer Override Modal"]:::ui
+    F -->|"Softmax Gate P >= 0.80"| G["Autonomous Tow Truck Dispatch"]:::api
+    F -->|"Softmax Gate P < 0.80 or ESCALATE"| H["HITL Review Queue & Officer Portal"]:::ui
 
     H -->|"Officer Feedback & Notes"| I["dpo_preference_pairs.jsonl"]:::feature
     I -->|"Automated Retraining"| J["Continuous DPO Retraining Pipeline"]:::rl
     J -->|"Auto Push"| K["Hugging Face Model Hub"]:::input
 ```
+
+---
+
+## 🚀 Elevated Stage 4 Agent Features
+
+1. **🛡️ Dedicated HITL Review Queue & Stream (`HitlQueuePanel.jsx`)**:
+   - Filterable stream (`All`, `HITL Review Required`, `Autonomous Executed`).
+   - Softmax confidence gauges, Qwen reasoning quotes, and 1-click Quick Approve / Override / View on Map actions.
+   - Prominent notification header pill with live pending review count.
+
+2. **🚛 Animated Tow Truck Agent & Dijkstra Map Dispatches (`TowTruckMarkers.jsx`)**:
+   - Spawns animated Tow Trucks and Patrol Interceptors at Police Station bases.
+   - Renders glowing **Dijkstra Green Corridor** shortest path polylines.
+   - Smoothly animates tow trucks moving step-by-step to the incident scene with siren pulse ring.
+   - Interactive popups with live speed, ETA (mins), distance remaining, and camera focus tracking.
+
+3. **🛠️ Interactive Tool Execution Trace Display (`ToolExecutionLog.jsx`)**:
+   - Displays real-time tool traces (`check_junction_cctv`, `query_available_units`, `calculate_shortest_route`, `issue_signal_override`, `broadcast_traffic_advisory`).
+   - Formats Dijkstra road graph node chains (e.g. `Madiwala ➔ Silk Board ➔ HSR Layout`) and signal priority timers.
 
 ---
 
@@ -53,10 +72,10 @@ The fine-tuned policy model (`HamzaBoy/qwen2.5-0.5b-traffic-sop`) executes dynam
 
 The policy outputs structured JSON decisions adhering to traffic officer Standard Operating Procedures:
 * **`VERIFY`**: Requests CCTV visual check when alert severity is ambiguous ($0.25 \le \text{severity} < 0.55$).
-* **`DISPATCH`**: Queries nearest unit, calculates Dijkstra route, issues Green Corridor, and assigns unit ($\text{severity} \ge 0.55$).
+* **`DISPATCH`**: Queries nearest unit, calculates Dijkstra route, issues Green Corridor, and dispatches a heavy tow truck ($\text{severity} \ge 0.55$).
 * **`RESOLVE`**: Closes ticket when traffic flow returns to baseline.
 * **`REJECT`**: Dismisses false positive or unverified reports ($\text{severity} < 0.25$).
-* **`ESCALATE`**: Broadcasts public advisory and forwards ticket to Human Supervisor popup modal for critical emergencies ($\text{severity} \ge 0.88$ or blocked ambulances).
+* **`ESCALATE`**: Broadcasts public advisory and forwards ticket to HITL Review Queue & Officer Override Modal for critical emergencies ($\text{severity} \ge 0.88$ or blocked ambulances).
 
 ---
 
