@@ -1,12 +1,12 @@
-import { useState, useCallback, useEffect } from 'react'
-import { Sun, Moon, Bell, Hexagon, Menu, X, ShieldAlert, Cpu } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Sun, Moon, Bell, Hexagon, Menu, X, ShieldAlert, Cpu, Truck, Zap, Activity } from 'lucide-react'
 import MapArea from './components/MapArea'
 import Sidebar from './components/Sidebar'
 import TimeSlider from './components/TimeSlider'
 import HitlOverrideModal from './components/HitlOverrideModal'
 import ToolExecutionLog from './components/ToolExecutionLog'
 import { useData } from './hooks/useData'
-import { predictAction, postHumanFeedback, fetchRlMetrics } from './api'
+import { predictAction, postHumanFeedback, fetchRlMetrics, STATION_COORDS, generateDijkstraWaypoints } from './api'
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
@@ -47,6 +47,78 @@ function LiveClock() {
   )
 }
 
+// Initial seed data for HITL Queue to show live agent activity immediately
+const INITIAL_QUEUE_SEED = [
+  {
+    ticket_id: 'CLUST_14',
+    police_station: 'Madiwala',
+    junction_name: 'Silk Board Junction',
+    latitude: 12.9172,
+    longitude: 77.6228,
+    severity_score: 0.94,
+    action: 'ESCALATE',
+    confidence: 0.76,
+    auto_execute: false,
+    reasoning: 'Critical multi-vehicle bottleneck on Hosur Main Road. Softmax confidence 76.4% triggers HITL Officer review.',
+    status: 'PENDING',
+    tool_calls_executed: [
+      { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: true, breakdown_type: 'STALLED_BUS' } },
+      { tool: 'query_available_units', result: { police_station: 'Madiwala', available_units_count: 3 } },
+      { tool: 'calculate_shortest_route', result: { distance_km: 2.4, eta_mins: 7.2, path: ['Madiwala', 'Silk Board', 'HSR Layout'] } }
+    ]
+  },
+  {
+    ticket_id: 'CLUST_08',
+    police_station: 'Upparpet',
+    junction_name: 'Majestic Station Corridor',
+    latitude: 12.9767,
+    longitude: 77.5713,
+    severity_score: 0.88,
+    action: 'DISPATCH',
+    confidence: 0.78,
+    auto_execute: false,
+    reasoning: 'Heavy illegal bus parking blocking CBD lane. Requires officer clearance approval.',
+    status: 'PENDING',
+    tool_calls_executed: [
+      { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: true, breakdown_type: 'ILLEGAL_PARKING_CLUSTER' } },
+      { tool: 'calculate_shortest_route', result: { distance_km: 3.1, eta_mins: 9.5, path: ['Upparpet', 'Majestic', 'Cubbon Park'] } }
+    ]
+  },
+  {
+    ticket_id: 'CLUST_22',
+    police_station: 'Koramangala',
+    junction_name: 'Sony World Junction',
+    latitude: 12.9352,
+    longitude: 77.6245,
+    severity_score: 0.65,
+    action: 'DISPATCH',
+    confidence: 0.92,
+    auto_execute: true,
+    reasoning: 'High severity single-lane blockage. Auto-dispatched Heavy Tow Unit MAD_HEAV_01 via Dijkstra path.',
+    status: 'AUTONOMOUS',
+    tool_calls_executed: [
+      { tool: 'query_available_units', result: { police_station: 'Koramangala', available_units_count: 2 } },
+      { tool: 'issue_signal_override', result: { status: 'SUCCESS', override_mode: 'GREEN_CORRIDOR_PRIORITY' } }
+    ]
+  },
+  {
+    ticket_id: 'TICK_402',
+    police_station: 'Indiranagar',
+    junction_name: '100ft Road Corridor',
+    latitude: 12.9784,
+    longitude: 77.6408,
+    severity_score: 0.42,
+    action: 'VERIFY',
+    confidence: 0.88,
+    auto_execute: true,
+    reasoning: 'Moderate severity double parking alert. Auto-issued CCTV visual inspection.',
+    status: 'AUTONOMOUS',
+    tool_calls_executed: [
+      { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: false } }
+    ]
+  }
+]
+
 export default function App() {
   const [hourMin, setHourMin] = useState(0)
   const [hourMax, setHourMax] = useState(23)
@@ -54,11 +126,17 @@ export default function App() {
   const [flyToTarget, setFlyToTarget] = useState(null)
   const [simulatePin, setSimulatePin] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('HITL Queue')
 
   // Stage 4 RL & HITL States
   const [hitlModalOpen, setHitlModalOpen] = useState(false)
   const [activePrediction, setActivePrediction] = useState(null)
   const [rlMetrics, setRlMetrics] = useState(null)
+  const [queueItems, setQueueItems] = useState(INITIAL_QUEUE_SEED)
+
+  // Tow Truck Fleet & Animation State
+  const [activeTrucks, setActiveTrucks] = useState([])
+  const animFrameRef = useRef(null)
 
   const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(hourMin, hourMax, cascadeStage >= 1)
 
@@ -66,69 +144,247 @@ export default function App() {
     fetchRlMetrics().then(data => setRlMetrics(data)).catch(() => {})
   }, [])
 
+  // Auto-seed initial queue items from fetched DBSCAN clusters if available
+  useEffect(() => {
+    if (clusters && clusters.length > 0) {
+      const clusterItems = clusters.slice(0, 4).map((c, idx) => ({
+        ticket_id: `CLUST_${c.cluster_id}`,
+        police_station: c.top_station || 'Madiwala',
+        junction_name: `${c.top_station || 'Madiwala'} Junction`,
+        latitude: c.latitude,
+        longitude: c.longitude,
+        severity_score: c.avg_severity || 0.75,
+        action: c.avg_severity >= 0.85 ? 'ESCALATE' : c.avg_severity >= 0.55 ? 'DISPATCH' : 'VERIFY',
+        confidence: c.avg_severity >= 0.85 ? 0.76 : 0.91,
+        auto_execute: c.avg_severity < 0.85,
+        reasoning: `DBSCAN Hotspot #${idx + 1} (${c.count} violations, radius ${c.radius_m.toFixed(0)}m). Qwen SOP evaluation.`,
+        status: c.avg_severity >= 0.85 ? 'PENDING' : 'AUTONOMOUS',
+        tool_calls_executed: [
+          { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: c.avg_severity > 0.6 } },
+          { tool: 'calculate_shortest_route', result: { distance_km: (2 + idx * 0.7).toFixed(1), eta_mins: (6 + idx * 2).toFixed(1), path: [c.top_station || 'Madiwala', 'Silk Board'] } }
+        ]
+      }))
+
+      // Merge unique items into queue
+      setQueueItems(prev => {
+        const existingIds = new Set(prev.map(i => i.ticket_id))
+        const newItems = clusterItems.filter(i => !existingIds.has(i.ticket_id))
+        return [...prev, ...newItems]
+      })
+    }
+  }, [clusters])
+
+  // Continuous animation loop for active tow trucks moving along Dijkstra waypoints
+  useEffect(() => {
+    if (activeTrucks.length === 0) return
+
+    const animate = () => {
+      setActiveTrucks(prevTrucks => {
+        return prevTrucks.map(truck => {
+          if (truck.progress >= 1) {
+            return { ...truck, status: 'ARRIVED', progress: 1 }
+          }
+
+          const newProgress = Math.min(1, truck.progress + 0.008) // step progress
+          const path = truck.path_coords || []
+
+          if (path.length > 0) {
+            const indexFloat = newProgress * (path.length - 1)
+            const currIdx = Math.floor(indexFloat)
+            const nextIdx = Math.min(path.length - 1, currIdx + 1)
+            const factor = indexFloat - currIdx
+
+            const currPoint = path[currIdx]
+            const nextPoint = path[nextIdx]
+
+            const interpolatedLat = currPoint[0] + (nextPoint[0] - currPoint[0]) * factor
+            const interpolatedLon = currPoint[1] + (nextPoint[1] - currPoint[1]) * factor
+
+            return {
+              ...truck,
+              progress: newProgress,
+              currentPos: { lat: interpolatedLat, lon: interpolatedLon },
+              status: newProgress >= 1 ? 'ARRIVED' : 'EN ROUTE'
+            }
+          }
+          return truck
+        })
+      })
+
+      animFrameRef.current = requestAnimationFrame(animate)
+    }
+
+    animFrameRef.current = requestAnimationFrame(animate)
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+    }
+  }, [activeTrucks.length])
+
+  // Dispatch Tow Truck Unit Function
+  const handleDispatchTowTruck = useCallback((targetItem) => {
+    const targetLat = targetItem.latitude || targetItem.lat || 12.9172
+    const targetLon = targetItem.longitude || targetItem.lon || 77.6228
+    const stationName = targetItem.police_station || 'Madiwala'
+    const startCoords = STATION_COORDS[stationName] || [12.9255, 77.6186]
+
+    // Generate Dijkstra road path waypoints
+    const waypoints = generateDijkstraWaypoints(startCoords, [targetLat, targetLon], 25)
+
+    const truckId = `TOW_${Date.now().toString().slice(-4)}`
+    const newTruck = {
+      id: truckId,
+      unit_id: `${stationName.toUpperCase().slice(0, 3)}_HEAV_${Math.floor(Math.random() * 8 + 1).toString().padStart(2, '0')}`,
+      unit_type: 'HEAVY_TOW_TRUCK',
+      police_station: stationName,
+      ticket_id: targetItem.ticket_id || 'Incident',
+      startPos: { lat: startCoords[0], lon: startCoords[1] },
+      targetPos: { lat: targetLat, lon: targetLon },
+      currentPos: { lat: startCoords[0], lon: startCoords[1] },
+      path_coords: waypoints,
+      progress: 0,
+      status: 'EN ROUTE',
+      dist_km: 2.4,
+      eta_mins: 7.2,
+    }
+
+    setActiveTrucks(prev => [...prev.filter(t => t.ticket_id !== newTruck.ticket_id), newTruck])
+    setFlyToTarget({ lat: targetLat, lon: targetLon })
+  }, [])
+
   const handleRangeChange = useCallback((min, max) => {
     setHourMin(min)
     setHourMax(max)
   }, [])
 
+  // Trigger Stage 4 RL SOP Evaluation on hotspot click
   const handleHotspotClick = useCallback(async (cluster) => {
     setFlyToTarget({ lat: cluster.latitude, lon: cluster.longitude })
-    setSidebarOpen(false)
 
-    // Trigger Stage 4 RL SOP Evaluation on hotspot click
     try {
       const pred = await predictAction({
         ticket_id: `CLUST_${cluster.cluster_id}`,
         latitude: cluster.latitude,
         longitude: cluster.longitude,
         police_station: cluster.top_station || 'Madiwala',
-        junction_name: 'Silk Board Junction',
+        junction_name: `${cluster.top_station || 'Madiwala'} Junction`,
         severity_score: cluster.avg_severity || 0.75,
         report_count: cluster.count || 5
       })
       setActivePrediction(pred)
 
-      // If low confidence or ESCALATE -> open HITL Modal
+      // Append/Update queue item
+      setQueueItems(prev => {
+        const itemIndex = prev.findIndex(i => i.ticket_id === pred.ticket_id)
+        const newItem = {
+          ...pred,
+          latitude: cluster.latitude,
+          longitude: cluster.longitude,
+          police_station: cluster.top_station || 'Madiwala',
+          junction_name: `${cluster.top_station || 'Madiwala'} Junction`,
+          status: (!pred.auto_execute || pred.action === 'ESCALATE') ? 'PENDING' : 'AUTONOMOUS'
+        }
+        if (itemIndex >= 0) {
+          const updated = [...prev]
+          updated[itemIndex] = newItem
+          return updated
+        }
+        return [newItem, ...prev]
+      })
+
       if (!pred.auto_execute || pred.action === 'ESCALATE') {
         setHitlModalOpen(true)
+      } else if (pred.action === 'DISPATCH') {
+        handleDispatchTowTruck(pred)
       }
     } catch (err) {
       console.error('RL Action Prediction failed:', err)
     }
-  }, [])
+  }, [handleDispatchTowTruck])
 
+  // Handle Simulation
   const handleSimulateResult = useCallback(async (pin) => {
     setSimulatePin(pin)
     setFlyToTarget({ lat: pin.lat, lon: pin.lon })
-    setSidebarOpen(false)
 
-    // Run Stage 4 RL SOP Policy on simulated report
     try {
+      const ticketId = `SIM_${Date.now().toString().slice(-4)}`
       const pred = await predictAction({
-        ticket_id: `SIM_${Date.now().toString().slice(-4)}`,
+        ticket_id: ticketId,
         latitude: pin.lat,
         longitude: pin.lon,
         police_station: 'Madiwala',
         junction_name: pin.junction_name || 'Silk Board Junction',
-        severity_score: pin.severity_score || 0.75,
+        severity_score: pin.severity || 0.75,
         report_count: 1
       })
-      setActivePrediction(pred)
+
+      const newItem = {
+        ...pred,
+        latitude: pin.lat,
+        longitude: pin.lon,
+        police_station: 'Madiwala',
+        junction_name: pin.junction_name || 'Silk Board Junction',
+        status: (!pred.auto_execute || pred.action === 'ESCALATE') ? 'PENDING' : 'AUTONOMOUS'
+      }
+
+      setActivePrediction(newItem)
+      setQueueItems(prev => [newItem, ...prev])
 
       if (!pred.auto_execute || pred.action === 'ESCALATE') {
         setHitlModalOpen(true)
+      } else if (pred.action === 'DISPATCH') {
+        handleDispatchTowTruck(newItem)
       }
     } catch (err) {
       console.error('RL Prediction failed on simulation:', err)
     }
-  }, [])
+  }, [handleDispatchTowTruck])
+
+  // Selecting item from queue
+  const handleSelectQueueItem = (item) => {
+    setActivePrediction(item)
+    if (item.latitude && item.longitude) {
+      setFlyToTarget({ lat: item.latitude, lon: item.longitude })
+    }
+    if (!item.auto_execute || item.action === 'ESCALATE' || item.status === 'PENDING') {
+      setHitlModalOpen(true)
+    }
+  }
+
+  // Quick Approve item in queue
+  const handleApproveQueueItem = async (item) => {
+    await postHumanFeedback({
+      ticket_id: item.ticket_id,
+      original_action: item.action,
+      officer_action: item.action,
+      is_approved: true,
+      officer_notes: 'Quick approved from HITL Queue',
+      incident_state: { severity_score: item.severity_score, assigned_unit: item.assigned_unit }
+    })
+
+    setQueueItems(prev => prev.map(i => i.ticket_id === item.ticket_id ? { ...i, status: 'APPROVED', auto_execute: true } : i))
+
+    if (item.action === 'DISPATCH' || item.action === 'ESCALATE') {
+      handleDispatchTowTruck(item)
+    }
+
+    const updatedMetrics = await fetchRlMetrics()
+    setRlMetrics(updatedMetrics)
+  }
 
   const handleHumanFeedbackSubmit = async (feedbackData) => {
     await postHumanFeedback(feedbackData)
-    // Refresh metrics
+    setQueueItems(prev => prev.map(i => i.ticket_id === feedbackData.ticket_id ? {
+      ...i,
+      status: feedbackData.is_approved ? 'APPROVED' : 'OVERRIDDEN',
+      officer_action: feedbackData.officer_action
+    } : i))
+
     const updated = await fetchRlMetrics()
     setRlMetrics(updated)
   }
+
+  const pendingHitlCount = queueItems.filter(i => !i.auto_execute || i.action === 'ESCALATE' || i.status === 'PENDING').length
 
   const stageLabels = [
     { id: 0, label: 'Raw' },
@@ -153,7 +409,7 @@ export default function App() {
       <aside
         className={`
           fixed md:relative z-50 md:z-auto
-          h-screen w-[340px] shrink-0
+          h-screen w-[360px] shrink-0
           transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:flex
@@ -164,6 +420,13 @@ export default function App() {
           clusters={clusters}
           onHotspotClick={handleHotspotClick}
           onSimulateResult={handleSimulateResult}
+          queueItems={queueItems}
+          onSelectQueueItem={handleSelectQueueItem}
+          onApproveAction={handleApproveQueueItem}
+          onDispatchTowTruck={handleDispatchTowTruck}
+          rlMetrics={rlMetrics}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
         />
         {/* Close button for mobile */}
         <button
@@ -177,7 +440,7 @@ export default function App() {
       {/* ── Main Area ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {/* ── Navbar ── */}
+        {/* ── Top Navbar ── */}
         <header className="sticky top-0 z-40 h-[60px] bg-bg-page border-b border-bg-border flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0">
           {/* Left — Hamburger + Connection Status */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -189,25 +452,26 @@ export default function App() {
               <Menu size={18} className="text-text-secondary" />
             </button>
 
-            <div className="flex items-center gap-2 rounded-full bg-bg-canvas border border-bg-border px-2.5 sm:px-3 py-1.5 shrink-0">
-              <div className="w-2 h-2 rounded-full bg-risk-low" />
-              <span className="text-xs font-medium text-text-secondary hidden sm:inline">
-                Qwen 2.5 0.5B RL Active
+            {/* Qwen Status Badge */}
+            <div className="flex items-center gap-2 rounded-full bg-bg-canvas border border-bg-border px-3 py-1.5 shrink-0">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold text-text-primary hidden sm:inline">
+                Qwen 2.5 0.5B RL SOP
               </span>
-              <span className="text-xs font-medium text-text-secondary sm:hidden">
-                RL Active
+              <span className="text-xs font-bold text-text-primary sm:hidden">
+                Qwen SOP
               </span>
             </div>
 
-            {/* Stage Toggles */}
-            <div className="hidden xl:flex items-center gap-1 bg-bg-canvas border border-bg-border rounded-lg p-1">
+            {/* Stage Cascade Toggles */}
+            <div className="hidden lg:flex items-center gap-1 bg-bg-canvas border border-bg-border rounded-lg p-1">
               {stageLabels.map(stage => (
                 <button
                   key={stage.id}
                   onClick={() => setCascadeStage(stage.id)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
                     cascadeStage >= stage.id
-                      ? 'bg-accent-blue/10 text-accent-blue'
+                      ? 'bg-accent-blue/15 text-accent-blue'
                       : 'text-text-muted hover:text-text-primary hover:bg-bg-hover'
                   }`}
                 >
@@ -219,30 +483,50 @@ export default function App() {
             {loading && <div className="spinner shrink-0" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />}
           </div>
 
-          {/* Right — Clock, Theme, Bell, Avatar */}
+          {/* Right — HITL Queue Badge, Tow Truck Count, Clock, Theme */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <LiveClock />
-            <ThemeToggle />
+            {/* Prominent HITL Review Queue Launcher Button */}
             <button
               onClick={() => {
-                if (activePrediction) setHitlModalOpen(true)
+                setActiveTab('HITL Queue')
+                setSidebarOpen(true)
               }}
-              title="Test HITL Officer Modal"
-              className="relative p-2 rounded-lg bg-bg-canvas border border-bg-border hover:bg-bg-hover transition-colors text-amber-500"
+              className={`relative px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all shadow-md ${
+                pendingHitlCount > 0
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 hover:bg-amber-500/30'
+                  : 'bg-bg-canvas text-text-secondary border-bg-border hover:bg-bg-hover'
+              }`}
             >
-              <ShieldAlert size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+              <ShieldAlert size={16} className={pendingHitlCount > 0 ? 'animate-pulse text-amber-400' : ''} />
+              <span className="hidden sm:inline">HITL Review Queue</span>
+              {pendingHitlCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-black font-mono font-extrabold text-[10px]">
+                  {pendingHitlCount}
+                </span>
+              )}
             </button>
+
+            {/* Active Tow Trucks counter pill */}
+            {activeTrucks.length > 0 && (
+              <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-bold">
+                <Truck size={15} className="animate-bounce" />
+                <span>{activeTrucks.length} Tow Units Active</span>
+              </div>
+            )}
+
+            <LiveClock />
+            <ThemeToggle />
+
             <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-bg-border">
               <div className="w-8 h-8 rounded-full bg-accent-blue/15 flex items-center justify-center">
-                <span className="text-xs font-medium text-accent-blue">TC</span>
+                <span className="text-xs font-bold text-accent-blue">TC</span>
               </div>
-              <span className="text-sm font-medium text-text-primary">Officer</span>
+              <span className="text-sm font-semibold text-text-primary">Officer</span>
             </div>
           </div>
         </header>
 
-        {/* ── Content ── */}
+        {/* ── Main Content Area ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Error banner */}
           {error && (
@@ -276,32 +560,34 @@ export default function App() {
               cascadeStage={cascadeStage}
               flyToTarget={flyToTarget}
               simulatePin={simulatePin}
+              activeTrucks={activeTrucks}
             />
 
-            {/* Map legend */}
-            <div className="absolute bottom-4 right-4 z-10 bg-bg-card border border-bg-border rounded-xl p-3 text-xs space-y-1.5 hidden sm:block">
-              <div className="text-text-muted font-medium mb-1.5 text-xs uppercase tracking-widest">
-                Severity & RL SOP
+            {/* Map Legend */}
+            <div className="absolute bottom-4 right-4 z-10 bg-bg-card/90 border border-bg-border rounded-xl p-3 text-xs space-y-1.5 backdrop-blur-md hidden sm:block shadow-xl">
+              <div className="text-text-muted font-bold mb-1.5 text-[10px] uppercase tracking-widest">
+                Map Layers & Units
               </div>
               {[
-                { token: 'risk-low', label: 'Low / REJECT (0-25%)' },
-                { token: 'risk-moderate', label: 'Moderate / VERIFY (25-50%)' },
-                { token: 'risk-high', label: 'High / DISPATCH (50-75%)' },
-                { token: 'risk-critical', label: 'Critical / ESCALATE (75-100%)' },
+                { token: 'bg-emerald-500', label: 'Low Risk (0-25%)' },
+                { token: 'bg-amber-500', label: 'Moderate Risk (25-50%)' },
+                { token: 'bg-rose-500', label: 'High / Critical (50-100%)' },
+                { token: 'bg-amber-400 border border-white', label: 'Heavy Tow Truck Unit' },
               ].map(({ token, label }) => (
                 <div key={label} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full shrink-0 bg-${token}`} />
-                  <span className="text-text-secondary">{label}</span>
+                  <div className={`w-3 h-3 rounded-full shrink-0 ${token}`} />
+                  <span className="text-text-secondary text-[11px] font-medium">{label}</span>
                 </div>
               ))}
             </div>
 
-            {/* Live Tool Execution Log Overlay */}
+            {/* Live Agentic Tool Execution Log Overlay */}
             {activePrediction && activePrediction.tool_calls_executed && (
               <div className="absolute bottom-4 left-4 z-10 max-w-sm w-full hidden lg:block">
                 <ToolExecutionLog
                   toolCalls={activePrediction.tool_calls_executed}
                   metrics={rlMetrics}
+                  onClose={() => setActivePrediction(null)}
                 />
               </div>
             )}
@@ -323,6 +609,7 @@ export default function App() {
         prediction={activePrediction}
         onClose={() => setHitlModalOpen(false)}
         onSubmitFeedback={handleHumanFeedbackSubmit}
+        onDispatchTowTruck={handleDispatchTowTruck}
       />
 
       {/* ── GitHub FAB ── */}

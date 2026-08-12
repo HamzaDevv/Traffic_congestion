@@ -1,8 +1,15 @@
 import React, { useState } from 'react'
+import { ShieldAlert, Truck, CheckCircle2, AlertTriangle, X, Activity, Wrench } from 'lucide-react'
 
 const ACTIONS = ['VERIFY', 'DISPATCH', 'RESOLVE', 'REJECT', 'ESCALATE']
 
-export default function HitlOverrideModal({ isOpen, prediction, onClose, onSubmitFeedback }) {
+export default function HitlOverrideModal({
+  isOpen,
+  prediction,
+  onClose,
+  onSubmitFeedback,
+  onDispatchTowTruck
+}) {
   if (!isOpen || !prediction) return null
 
   const [selectedAction, setSelectedAction] = useState(prediction.action)
@@ -13,11 +20,13 @@ export default function HitlOverrideModal({ isOpen, prediction, onClose, onSubmi
 
   const handleSubmit = async (isApprovedChoice) => {
     setIsSubmitting(true)
+    const finalAction = isApprovedChoice ? prediction.action : selectedAction
+
     try {
       await onSubmitFeedback({
         ticket_id: prediction.ticket_id,
         original_action: prediction.action,
-        officer_action: isApprovedChoice ? prediction.action : selectedAction,
+        officer_action: finalAction,
         is_approved: isApprovedChoice,
         officer_notes: officerNotes,
         incident_state: {
@@ -25,6 +34,12 @@ export default function HitlOverrideModal({ isOpen, prediction, onClose, onSubmi
           assigned_unit: prediction.assigned_unit
         }
       })
+
+      // If action is DISPATCH or ESCALATE, trigger tow truck animation
+      if ((finalAction === 'DISPATCH' || finalAction === 'ESCALATE') && onDispatchTowTruck) {
+        onDispatchTowTruck(prediction)
+      }
+
       onClose()
     } catch (err) {
       console.error('Failed to log officer feedback:', err)
@@ -35,183 +50,153 @@ export default function HitlOverrideModal({ isOpen, prediction, onClose, onSubmi
 
   const getActionColor = (act) => {
     switch (act) {
-      case 'DISPATCH': return '#10b981'
-      case 'ESCALATE': return '#ef4444'
-      case 'VERIFY': return '#f59e0b'
-      case 'RESOLVE': return '#3b82f6'
-      default: return '#6b7280'
+      case 'DISPATCH': return 'bg-emerald-500 text-white'
+      case 'ESCALATE': return 'bg-rose-500 text-white'
+      case 'VERIFY': return 'bg-amber-500 text-white'
+      case 'RESOLVE': return 'bg-blue-500 text-white'
+      default: return 'bg-slate-600 text-white'
     }
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.85)',
-      backdropFilter: 'blur(6px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      fontFamily: 'Inter, system-ui, sans-serif'
-    }}>
-      <div style={{
-        backgroundColor: '#1e293b',
-        border: '1px solid #334155',
-        borderRadius: '16px',
-        padding: '28px',
-        maxWidth: '640px',
-        width: '90%',
-        color: '#f8fafc',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-      }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in font-sans">
+      <div className="bg-bg-card border border-bg-border rounded-2xl p-6 max-w-2xl w-full text-text-primary shadow-2xl space-y-5">
+
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between">
           <div>
-            <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#f59e0b', textTransform: 'uppercase' }}>
-              ⚠️ Human-in-the-Loop Officer Override Required
-            </span>
-            <h2 style={{ fontSize: '20px', fontWeight: '800', margin: '4px 0 0 0', color: '#f8fafc' }}>
-              Incident Ticket #{prediction.ticket_id}
+            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+              <ShieldAlert className="w-4 h-4 animate-pulse" />
+              Human-in-the-Loop Officer Override Portal
+            </div>
+            <h2 className="text-xl font-extrabold text-text-primary mt-1">
+              Incident #{prediction.ticket_id}
             </h2>
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}
+            className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
           >
-            ✕
+            <X size={20} />
           </button>
         </div>
 
-        {/* Prediction Card */}
-        <div style={{ backgroundColor: '#0f172a', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #1e293b' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <div>
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Qwen 2.5 Policy Action:</span>
-              <span style={{
-                marginLeft: '8px',
-                padding: '4px 10px',
-                borderRadius: '6px',
-                fontWeight: '700',
-                fontSize: '13px',
-                backgroundColor: getActionColor(prediction.action),
-                color: '#ffffff'
-              }}>
+        {/* ── Model Recommendation Box ── */}
+        <div className="bg-bg-canvas/90 border border-bg-border rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-muted font-medium">Qwen 2.5 Policy Action:</span>
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase tracking-wide ${getActionColor(prediction.action)}`}>
                 {prediction.action}
               </span>
             </div>
-            <div>
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Softmax Confidence: </span>
-              <span style={{ fontWeight: '700', color: prediction.confidence >= 0.8 ? '#10b981' : '#f59e0b' }}>
-                {(prediction.confidence * 100).toFixed(1)}%
+            <div className="text-xs">
+              <span className="text-text-muted">Softmax Confidence: </span>
+              <span className={`font-mono font-bold ${
+                (prediction.confidence || 0) >= 0.80 ? 'text-emerald-400' : 'text-amber-400 font-extrabold'
+              }`}>
+                {((prediction.confidence || 0) * 100).toFixed(1)}%
               </span>
             </div>
           </div>
 
-          <p style={{ fontSize: '14px', color: '#cbd5e1', lineHeight: '1.5', margin: '0 0 12px 0' }}>
+          <p className="text-xs sm:text-sm text-text-secondary leading-relaxed italic bg-bg-card/50 p-2.5 rounded-lg border border-bg-border/60">
             "{prediction.reasoning}"
           </p>
 
           {/* Executed Tools Summary */}
           {prediction.tool_calls_executed && prediction.tool_calls_executed.length > 0 && (
-            <div style={{ backgroundColor: '#1e293b', padding: '10px 12px', borderRadius: '8px', fontSize: '12px', color: '#94a3b8' }}>
-              <div style={{ fontWeight: '600', color: '#38bdf8', marginBottom: '4px' }}>🛠️ Executed Agentic Tools:</div>
+            <div className="bg-bg-card/60 p-2.5 rounded-lg border border-bg-border text-xs space-y-1.5">
+              <div className="font-semibold text-accent-blue flex items-center gap-1.5">
+                <Wrench size={13} /> Executed Agentic Tools ({prediction.tool_calls_executed.length}):
+              </div>
               {prediction.tool_calls_executed.map((tc, idx) => (
-                <div key={idx} style={{ margin: '2px 0' }}>
-                  • <strong style={{ color: '#cbd5e1' }}>{tc.tool}</strong>: {JSON.stringify(tc.result).slice(0, 75)}...
+                <div key={idx} className="text-[11px] text-text-muted flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-blue" />
+                  <strong className="text-text-primary font-mono">{tc.tool}()</strong>
+                  <span className="truncate max-w-xs text-text-muted">
+                    {JSON.stringify(tc.result).slice(0, 65)}...
+                  </span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Officer Override Selection */}
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px' }}>
-            Officer Decision / Override Choice:
+        {/* ── Officer Override Selection ── */}
+        <div>
+          <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+            Officer Action Choice / Override:
           </label>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {ACTIONS.map((act) => (
-              <button
-                key={act}
-                onClick={() => setSelectedAction(act)}
-                style={{
-                  flex: '1 1 auto',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: selectedAction === act ? '2px solid #38bdf8' : '1px solid #334155',
-                  backgroundColor: selectedAction === act ? '#0284c7' : '#1e293b',
-                  color: '#ffffff',
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {act}
-              </button>
-            ))}
+          <div className="flex gap-2 flex-wrap">
+            {ACTIONS.map((act) => {
+              const isSelected = selectedAction === act
+              return (
+                <button
+                  key={act}
+                  type="button"
+                  onClick={() => setSelectedAction(act)}
+                  className={`flex-1 min-w-[90px] py-2 px-3 rounded-xl font-bold text-xs transition-all border ${
+                    isSelected
+                      ? 'bg-accent-blue text-white border-accent-blue shadow-lg shadow-accent-blue/30 scale-105'
+                      : 'bg-bg-canvas text-text-muted border-bg-border hover:bg-bg-hover hover:text-text-primary'
+                  }`}
+                >
+                  {act}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Optional Officer Notes */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px' }}>
-            Officer Log Notes (For Continuous DPO Retraining):
+        {/* ── Officer DPO Log Notes ── */}
+        <div>
+          <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+            Officer DPO Rationale (Continuous RL Alignment):
           </label>
           <textarea
             value={officerNotes}
             onChange={(e) => setOfficerNotes(e.target.value)}
-            placeholder="Add operational rationale for approval or override choice..."
-            rows={3}
-            style={{
-              width: '100%',
-              backgroundColor: '#0f172a',
-              border: '1px solid #334155',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              color: '#f8fafc',
-              fontSize: '13px',
-              resize: 'vertical',
-              boxSizing: 'border-box'
-            }}
+            placeholder="Add operational rationale for approval or override decision..."
+            rows={2}
+            className="w-full bg-bg-canvas border border-bg-border rounded-xl p-3 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue"
           />
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        {/* ── Modal Footer Buttons ── */}
+        <div className="flex items-center justify-between pt-2 border-t border-bg-border">
           <button
-            onClick={() => handleSubmit(false)}
-            disabled={isSubmitting || !isOverride}
-            style={{
-              padding: '10px 18px',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: isOverride ? '#f59e0b' : '#475569',
-              color: '#ffffff',
-              fontWeight: '700',
-              cursor: isOverride ? 'pointer' : 'not-allowed',
-              opacity: isSubmitting ? 0.6 : 1
+            type="button"
+            onClick={() => {
+              if (onDispatchTowTruck) onDispatchTowTruck(prediction)
             }}
+            className="px-3 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/25 transition-colors flex items-center gap-1.5"
           >
-            Submit Override Decision
+            <Truck size={14} /> Dispatch Tow Unit Now
           </button>
-          <button
-            onClick={() => handleSubmit(true)}
-            disabled={isSubmitting}
-            style={{
-              padding: '10px 22px',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: '#10b981',
-              color: '#ffffff',
-              fontWeight: '700',
-              cursor: 'pointer',
-              opacity: isSubmitting ? 0.6 : 1
-            }}
-          >
-            Approve Qwen Action ({prediction.action})
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSubmit(false)}
+              disabled={isSubmitting || !isOverride}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+                isOverride
+                  ? 'bg-amber-500 hover:bg-amber-600 text-black shadow-md'
+                  : 'bg-bg-hover text-text-muted cursor-not-allowed'
+              }`}
+            >
+              Submit Override Action
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSubmit(true)}
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-colors shadow-md flex items-center gap-1.5"
+            >
+              <CheckCircle2 size={14} /> Approve Qwen Action ({prediction.action})
+            </button>
+          </div>
         </div>
       </div>
     </div>

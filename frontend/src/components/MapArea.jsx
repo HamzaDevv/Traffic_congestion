@@ -2,6 +2,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaf
 import { useEffect } from 'react'
 import HeatmapLayer from './HeatmapLayer'
 import ClusterMarkers from './ClusterMarkers'
+import TowTruckMarkers from './TowTruckMarkers'
 
 // ── Fly-to helper ──
 function FlyTo({ target }) {
@@ -39,6 +40,7 @@ export default function MapArea({
   flyToTarget,
   simulatePin,
   cascadeStage,
+  activeTrucks = [],
 }) {
   return (
     <MapContainer
@@ -149,6 +151,9 @@ export default function MapArea({
           </Popup>
         </CircleMarker>
       )}
+
+      {/* ── Tow Truck Fleet Layer ── */}
+      <TowTruckMarkers activeTrucks={activeTrucks} />
     </MapContainer>
   )
 }

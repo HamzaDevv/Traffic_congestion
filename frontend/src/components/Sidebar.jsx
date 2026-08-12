@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Hexagon, BarChart3, MapPin, FlaskConical, CheckCircle, Activity, Layers, ChevronDown, ChevronUp, Truck } from 'lucide-react'
+import { Hexagon, BarChart3, MapPin, FlaskConical, CheckCircle, Activity, Layers, ChevronDown, ChevronUp, Truck, ShieldAlert, Cpu } from 'lucide-react'
 import StatsCards from './StatsCards'
 import SimulateForm from './SimulateForm'
+import HitlQueuePanel from './HitlQueuePanel'
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const VEHICLE_COLORS = {
@@ -30,35 +31,62 @@ function getRiskBarColor(sev) {
 }
 
 const TABS = [
+  { id: 'HITL Queue', icon: ShieldAlert, label: 'HITL Queue' },
   { id: 'Live Map', icon: BarChart3, label: 'Live Map' },
   { id: 'Dispatch Zones', icon: MapPin, label: 'Dispatch Zones' },
   { id: 'What-If', icon: FlaskConical, label: 'What-If' },
 ]
 
-export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateResult }) {
-  const [tab, setTab] = useState('Live Map')
+export default function Sidebar({
+  stats,
+  clusters,
+  onHotspotClick,
+  onSimulateResult,
+  queueItems = [],
+  onSelectQueueItem,
+  onApproveAction,
+  onOverrideAction,
+  onDispatchTowTruck,
+  rlMetrics = null,
+  activeTab,
+  setActiveTab
+}) {
+  const [internalTab, setInternalTab] = useState('HITL Queue')
   const [showCascade, setShowCascade] = useState(false)
+
+  const currentTab = activeTab !== undefined ? activeTab : internalTab
+  const handleTabChange = (tId) => {
+    if (setActiveTab) setActiveTab(tId)
+    else setInternalTab(tId)
+  }
+
+  const pendingHitlCount = queueItems.filter(i => !i.auto_execute || i.action === 'ESCALATE' || i.status === 'PENDING').length
 
   return (
     <div className="h-full flex flex-col bg-bg-canvas border-r border-bg-border overflow-hidden w-full">
 
       {/* ── Logo Area ── */}
-      <div className="h-[60px] flex items-center gap-2.5 px-4 border-b border-bg-border shrink-0">
-        <Hexagon size={24} className="text-accent-yellow fill-accent-yellow/20" />
-        <span className="text-lg font-medium text-accent-yellow tracking-tight">TrafficCop AI</span>
+      <div className="h-[60px] flex items-center justify-between px-4 border-b border-bg-border shrink-0">
+        <div className="flex items-center gap-2.5">
+          <Hexagon size={24} className="text-accent-yellow fill-accent-yellow/20" />
+          <span className="text-lg font-bold text-accent-yellow tracking-tight">TrafficCop AI</span>
+        </div>
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-accent-blue/15 text-accent-blue border border-accent-blue/30">
+          Qwen 2.5 SOP
+        </span>
       </div>
 
       {/* ── Model status badge ── */}
       {stats && (
-        <div className="px-4 py-2.5 border-b border-bg-border">
+        <div className="px-4 py-2 border-b border-bg-border bg-bg-card/40">
           <button
             onClick={() => setShowCascade(p => !p)}
             className="w-full text-left flex items-center justify-between"
           >
-            <span className="text-xs font-medium uppercase tracking-widest text-text-muted">3-Stage AI Cascade</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">4-Stage AI & RL Cascade</span>
             <div className="flex items-center gap-1.5">
-              <span className={`text-xs font-medium ${stats.m1_loaded && stats.m2_loaded ? 'text-risk-low' : 'text-risk-moderate'}`}>
-                {stats.m1_loaded && stats.m2_loaded ? 'Active' : 'Heuristic'}
+              <span className="text-xs font-bold text-emerald-400">
+                RL Active
               </span>
               {showCascade ? <ChevronUp size={14} className="text-text-muted" /> : <ChevronDown size={14} className="text-text-muted" />}
             </div>
@@ -66,12 +94,13 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
           {showCascade && (
             <div className="mt-2 space-y-1 animate-fade-in">
               {[
-                { label: 'Stage 1: Triage (Filter)', loaded: stats.m1_loaded, desc: 'Filters invalid reports' },
-                { label: 'Stage 2: Impact Score', loaded: stats.m2_loaded, desc: 'Scores 0-100% severity' },
-                { label: 'Stage 3: Dispatch Zone', loaded: true, desc: `${stats.num_clusters} zones detected` },
+                { label: 'Stage 1: Gatekeeper Filter', loaded: stats.m1_loaded, desc: 'Filters invalid reports' },
+                { label: 'Stage 2: Impact Quantifier', loaded: stats.m2_loaded, desc: 'Scores 0-100% severity' },
+                { label: 'Stage 3: Hotspot Clusterer', loaded: true, desc: `${stats.num_clusters} DBSCAN zones` },
+                { label: 'Stage 4: Qwen 2.5 RL SOP', loaded: true, desc: 'Softmax Gated (87.4% Auto)' },
               ].map(m => (
                 <div key={m.label} className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-bg-hover/50">
-                  <span className={`mt-0.5 ${m.loaded ? 'text-risk-low' : 'text-text-muted'}`} style={{ fontSize: '10px' }}>
+                  <span className={`mt-0.5 ${m.loaded ? 'text-emerald-400' : 'text-text-muted'}`} style={{ fontSize: '10px' }}>
                     {m.loaded ? '\u25CF' : '\u25CB'}
                   </span>
                   <div>
@@ -88,33 +117,51 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
       )}
 
       {/* ── Tabs ── */}
-      <div className="flex px-4 pt-2 gap-1 border-b border-bg-border">
+      <div className="flex px-2 pt-2 gap-1 border-b border-bg-border overflow-x-auto no-scrollbar">
         {TABS.map(t => {
           const Icon = t.icon
-          const active = tab === t.id
+          const active = currentTab === t.id
+          const isHitl = t.id === 'HITL Queue'
           return (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-2 rounded-t-lg font-medium transition-colors ${
+              onClick={() => handleTabChange(t.id)}
+              className={`relative flex-1 min-w-[70px] flex items-center justify-center gap-1 text-[11px] py-2 rounded-t-lg font-bold transition-colors ${
                 active
-                  ? 'bg-accent-blue/10 text-accent-blue border-b-2 border-accent-blue'
+                  ? 'bg-accent-blue/15 text-accent-blue border-b-2 border-accent-blue'
                   : 'text-text-muted hover:text-text-primary hover:bg-bg-hover border-b-2 border-transparent'
               }`}
             >
-              <Icon size={14} />
-              {t.label}
+              <Icon size={13} className={isHitl && pendingHitlCount > 0 ? 'text-amber-400 animate-pulse' : ''} />
+              <span className="whitespace-nowrap">{t.label}</span>
+              {isHitl && pendingHitlCount > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-extrabold bg-amber-500 text-black">
+                  {pendingHitlCount}
+                </span>
+              )}
             </button>
           )
         })}
       </div>
 
       {/* ── Tab Content ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="flex-1 overflow-y-auto">
 
-        {/* ── OVERVIEW TAB ── */}
-        {tab === 'Live Map' && (
-          <div className="animate-fade-in space-y-4">
+        {/* ── HITL QUEUE TAB ── */}
+        {currentTab === 'HITL Queue' && (
+          <HitlQueuePanel
+            queueItems={queueItems}
+            onSelectQueueItem={onSelectQueueItem}
+            onApproveAction={onApproveAction}
+            onOverrideAction={onOverrideAction}
+            onDispatchTowTruck={onDispatchTowTruck}
+            rlMetrics={rlMetrics}
+          />
+        )}
+
+        {/* ── LIVE MAP OVERVIEW TAB ── */}
+        {currentTab === 'Live Map' && (
+          <div className="p-4 animate-fade-in space-y-4">
             <StatsCards stats={stats} />
 
             {/* Vehicle breakdown */}
@@ -224,20 +271,18 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
           </div>
         )}
 
-        {/* ── HOTSPOTS TAB ── */}
-        {tab === 'Dispatch Zones' && (
-          <div className="animate-fade-in">
+        {/* ── HOTSPOTS & DISPATCH ZONES TAB ── */}
+        {currentTab === 'Dispatch Zones' && (
+          <div className="p-4 animate-fade-in">
             <p className="text-xs text-text-muted mb-3">
-              {clusters.length} DBSCAN hotspot zones detected.
-              Click to fly to location.
+              {clusters.length} DBSCAN hotspot zones detected. Click to fly to location or dispatch tow truck.
             </p>
             <div className="space-y-2">
               {clusters.slice(0, 20).map((c, i) => {
                 const badge = getRiskBadge(c.avg_severity)
                 const barColor = getRiskBarColor(c.avg_severity)
-                const isTop3 = i < 3
                 return (
-                  <div key={c.cluster_id} className={`w-full text-left bg-bg-card border border-bg-border rounded-xl p-3 transition-all ${c._dispatched ? 'opacity-50 grayscale' : ''}`}>
+                  <div key={c.cluster_id} className={`w-full text-left bg-bg-card border border-bg-border rounded-xl p-3 transition-all ${c._dispatched ? 'border-emerald-500/40 bg-emerald-500/5' : ''}`}>
                     <button
                       onClick={() => onHotspotClick?.(c)}
                       className="w-full text-left"
@@ -245,10 +290,10 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-xs font-medium text-accent-yellow">
+                            <span className="text-xs font-bold text-accent-yellow">
                               #{i + 1}
                             </span>
-                            <span className="text-xs text-text-primary truncate">{c.top_station}</span>
+                            <span className="text-xs text-text-primary font-semibold truncate">{c.top_station}</span>
                           </div>
                           <div className="text-xs text-text-muted">
                             {c.count} violations · {c.radius_m.toFixed(0)}m radius
@@ -271,22 +316,28 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
                         </div>
                       </div>
                     </button>
-                    {isTop3 && !c._dispatched && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          c._dispatched = true
-                          document.getElementById(`btn-disp-${c.cluster_id}`).innerText = 'Dispatched'
-                          document.getElementById(`btn-disp-${c.cluster_id}`).disabled = true
-                          document.getElementById(`btn-disp-${c.cluster_id}`).style.opacity = '0.5'
-                        }}
-                        id={`btn-disp-${c.cluster_id}`}
-                        className="mt-3 w-full py-1.5 rounded-lg bg-accent-yellow text-bg-canvas text-xs font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <Truck size={14} />
-                        Dispatch Tow Truck
-                      </button>
-                    )}
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        c._dispatched = true
+                        onDispatchTowTruck?.({
+                          ticket_id: `CLUST_${c.cluster_id}`,
+                          latitude: c.latitude,
+                          longitude: c.longitude,
+                          police_station: c.top_station || 'Madiwala',
+                          junction_name: c.top_station ? `${c.top_station} Junction` : 'Silk Board Junction'
+                        })
+                      }}
+                      className={`mt-3 w-full py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        c._dispatched
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-accent-yellow hover:bg-yellow-500 text-bg-canvas shadow-md'
+                      }`}
+                    >
+                      <Truck size={14} />
+                      {c._dispatched ? 'Dispatching Tow Unit...' : 'Dispatch Tow Truck Unit'}
+                    </button>
                   </div>
                 )
               })}
@@ -295,14 +346,14 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
         )}
 
         {/* ── SIMULATE TAB ── */}
-        {tab === 'What-If' && (
-          <div className="animate-fade-in">
+        {currentTab === 'What-If' && (
+          <div className="p-4 animate-fade-in">
             <div className="mb-3">
               <h3 className="text-sm font-medium text-text-primary mb-1">
                 Report a New Violation
               </h3>
               <p className="text-xs text-text-muted leading-relaxed">
-                Drop a pin and run it through the AI cascade to estimate dispatch urgency.
+                Drop a pin and run it through the 4-stage AI cascade to evaluate agent tool actions.
               </p>
             </div>
             <SimulateForm onResult={onSimulateResult} />
@@ -311,10 +362,13 @@ export default function Sidebar({ stats, clusters, onHotspotClick, onSimulateRes
       </div>
 
       {/* ── Bottom Status ── */}
-      <div className="px-4 py-3 border-t border-bg-border shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-risk-low" />
-          <span className="text-xs font-medium text-text-muted">All Systems Nominal</span>
+      <div className="px-4 py-2.5 border-t border-bg-border shrink-0 bg-bg-card/40">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-semibold text-text-muted">Qwen 2.5 SOP Online</span>
+          </div>
+          <span className="text-[10px] font-mono text-text-muted">v2.0.0</span>
         </div>
       </div>
     </div>
