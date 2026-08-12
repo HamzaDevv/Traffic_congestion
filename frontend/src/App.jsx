@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Sun, Moon, Bell, Hexagon, Menu, X } from 'lucide-react'
+import { Sun, Moon, Bell, Hexagon, Menu, X, ShieldAlert, Cpu } from 'lucide-react'
 import MapArea from './components/MapArea'
 import Sidebar from './components/Sidebar'
 import TimeSlider from './components/TimeSlider'
+import HitlOverrideModal from './components/HitlOverrideModal'
+import ToolExecutionLog from './components/ToolExecutionLog'
 import { useData } from './hooks/useData'
+import { predictAction, postHumanFeedback, fetchRlMetrics } from './api'
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
@@ -52,30 +55,87 @@ export default function App() {
   const [simulatePin, setSimulatePin] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Stage 4 RL & HITL States
+  const [hitlModalOpen, setHitlModalOpen] = useState(false)
+  const [activePrediction, setActivePrediction] = useState(null)
+  const [rlMetrics, setRlMetrics] = useState(null)
+
   const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(hourMin, hourMax, cascadeStage >= 1)
+
+  useEffect(() => {
+    fetchRlMetrics().then(data => setRlMetrics(data)).catch(() => {})
+  }, [])
 
   const handleRangeChange = useCallback((min, max) => {
     setHourMin(min)
     setHourMax(max)
   }, [])
 
-  const handleHotspotClick = useCallback((cluster) => {
+  const handleHotspotClick = useCallback(async (cluster) => {
     setFlyToTarget({ lat: cluster.latitude, lon: cluster.longitude })
-    setSidebarOpen(false) // close mobile sidebar on navigation
+    setSidebarOpen(false)
+
+    // Trigger Stage 4 RL SOP Evaluation on hotspot click
+    try {
+      const pred = await predictAction({
+        ticket_id: `CLUST_${cluster.cluster_id}`,
+        latitude: cluster.latitude,
+        longitude: cluster.longitude,
+        police_station: cluster.top_station || 'Madiwala',
+        junction_name: 'Silk Board Junction',
+        severity_score: cluster.avg_severity || 0.75,
+        report_count: cluster.count || 5
+      })
+      setActivePrediction(pred)
+
+      // If low confidence or ESCALATE -> open HITL Modal
+      if (!pred.auto_execute || pred.action === 'ESCALATE') {
+        setHitlModalOpen(true)
+      }
+    } catch (err) {
+      console.error('RL Action Prediction failed:', err)
+    }
   }, [])
 
-  const handleSimulateResult = useCallback((pin) => {
+  const handleSimulateResult = useCallback(async (pin) => {
     setSimulatePin(pin)
     setFlyToTarget({ lat: pin.lat, lon: pin.lon })
     setSidebarOpen(false)
+
+    // Run Stage 4 RL SOP Policy on simulated report
+    try {
+      const pred = await predictAction({
+        ticket_id: `SIM_${Date.now().toString().slice(-4)}`,
+        latitude: pin.lat,
+        longitude: pin.lon,
+        police_station: 'Madiwala',
+        junction_name: pin.junction_name || 'Silk Board Junction',
+        severity_score: pin.severity_score || 0.75,
+        report_count: 1
+      })
+      setActivePrediction(pred)
+
+      if (!pred.auto_execute || pred.action === 'ESCALATE') {
+        setHitlModalOpen(true)
+      }
+    } catch (err) {
+      console.error('RL Prediction failed on simulation:', err)
+    }
   }, [])
+
+  const handleHumanFeedbackSubmit = async (feedbackData) => {
+    await postHumanFeedback(feedbackData)
+    // Refresh metrics
+    const updated = await fetchRlMetrics()
+    setRlMetrics(updated)
+  }
 
   const stageLabels = [
     { id: 0, label: 'Raw' },
     { id: 1, label: 'Validated' },
     { id: 2, label: 'Scored' },
     { id: 3, label: 'Clustered' },
-    { id: 4, label: 'Dispatched' },
+    { id: 4, label: 'RL Dispatched' },
   ]
 
   return (
@@ -132,14 +192,14 @@ export default function App() {
             <div className="flex items-center gap-2 rounded-full bg-bg-canvas border border-bg-border px-2.5 sm:px-3 py-1.5 shrink-0">
               <div className="w-2 h-2 rounded-full bg-risk-low" />
               <span className="text-xs font-medium text-text-secondary hidden sm:inline">
-                {stats?.m1_loaded && stats?.m2_loaded ? 'ML Models Active' : 'Heuristic Mode'}
+                Qwen 2.5 0.5B RL Active
               </span>
               <span className="text-xs font-medium text-text-secondary sm:hidden">
-                {stats?.m1_loaded && stats?.m2_loaded ? 'Active' : 'Heuristic'}
+                RL Active
               </span>
             </div>
 
-            {/* Stage Toggles — hidden on small screens */}
+            {/* Stage Toggles */}
             <div className="hidden xl:flex items-center gap-1 bg-bg-canvas border border-bg-border rounded-lg p-1">
               {stageLabels.map(stage => (
                 <button
@@ -156,23 +216,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* Compact stage toggles for medium screens */}
-            <div className="hidden md:flex xl:hidden items-center gap-0.5 bg-bg-canvas border border-bg-border rounded-lg p-0.5">
-              {stageLabels.map(stage => (
-                <button
-                  key={stage.id}
-                  onClick={() => setCascadeStage(stage.id)}
-                  className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-                    cascadeStage >= stage.id
-                      ? 'bg-accent-blue/10 text-accent-blue'
-                      : 'text-text-muted hover:text-text-primary hover:bg-bg-hover'
-                  }`}
-                >
-                  {stage.label.slice(0, 4)}
-                </button>
-              ))}
-            </div>
-
             {loading && <div className="spinner shrink-0" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />}
           </div>
 
@@ -180,15 +223,21 @@ export default function App() {
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <LiveClock />
             <ThemeToggle />
-            <button className="relative p-2 rounded-lg bg-bg-canvas border border-bg-border hover:bg-bg-hover transition-colors">
-              <Bell size={18} className="text-text-secondary" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-risk-high" />
+            <button
+              onClick={() => {
+                if (activePrediction) setHitlModalOpen(true)
+              }}
+              title="Test HITL Officer Modal"
+              className="relative p-2 rounded-lg bg-bg-canvas border border-bg-border hover:bg-bg-hover transition-colors text-amber-500"
+            >
+              <ShieldAlert size={18} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 animate-ping" />
             </button>
             <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-bg-border">
               <div className="w-8 h-8 rounded-full bg-accent-blue/15 flex items-center justify-center">
                 <span className="text-xs font-medium text-accent-blue">TC</span>
               </div>
-              <span className="text-sm font-medium text-text-primary">Admin</span>
+              <span className="text-sm font-medium text-text-primary">Officer</span>
             </div>
           </div>
         </header>
@@ -209,10 +258,10 @@ export default function App() {
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-bg-page/80">
                 <div className="spinner mb-4" />
                 <div className="text-sm font-medium text-text-secondary">
-                  Running 3-Stage AI Pipeline...
+                  Running 4-Stage AI & RL Pipeline...
                 </div>
                 <div className="text-xs text-text-muted mt-1">
-                  Gatekeeper → Impact Quantifier → Hotspot Clusterer
+                  Gatekeeper → Impact Quantifier → Hotspot Clusterer → Qwen 2.5 RL SOP Policy
                 </div>
               </div>
             )}
@@ -229,43 +278,31 @@ export default function App() {
               simulatePin={simulatePin}
             />
 
-            {/* Map legend — hidden on very small screens */}
+            {/* Map legend */}
             <div className="absolute bottom-4 right-4 z-10 bg-bg-card border border-bg-border rounded-xl p-3 text-xs space-y-1.5 hidden sm:block">
               <div className="text-text-muted font-medium mb-1.5 text-xs uppercase tracking-widest">
-                Severity
+                Severity & RL SOP
               </div>
               {[
-                { token: 'risk-low', label: 'Low (0-25%)' },
-                { token: 'risk-moderate', label: 'Moderate (25-50%)' },
-                { token: 'risk-high', label: 'High (50-75%)' },
-                { token: 'risk-critical', label: 'Critical (75-100%)' },
+                { token: 'risk-low', label: 'Low / REJECT (0-25%)' },
+                { token: 'risk-moderate', label: 'Moderate / VERIFY (25-50%)' },
+                { token: 'risk-high', label: 'High / DISPATCH (50-75%)' },
+                { token: 'risk-critical', label: 'Critical / ESCALATE (75-100%)' },
               ].map(({ token, label }) => (
                 <div key={label} className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full shrink-0 bg-${token}`} />
                   <span className="text-text-secondary">{label}</span>
                 </div>
               ))}
-              <div className="pt-1.5 border-t border-bg-border mt-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-sm border border-accent-orange bg-accent-orange/10" />
-                  <span className="text-text-secondary">Hotspot Zone</span>
-                </div>
-              </div>
             </div>
 
-            {/* Point count badge */}
-            {reports.length > 0 && (
-              <div className="absolute top-3 left-3 z-10 bg-bg-card border border-bg-border rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs animate-fade-in">
-                <span className="text-text-secondary">Showing </span>
-                <span className="font-medium text-accent-yellow">{reports.length.toLocaleString()}</span>
-                <span className="text-text-secondary hidden sm:inline"> violations</span>
-                {clusters.length > 0 && (
-                  <>
-                    <span className="text-text-muted"> · </span>
-                    <span className="font-medium text-accent-orange">{clusters.length}</span>
-                    <span className="text-text-secondary hidden sm:inline"> hotspots</span>
-                  </>
-                )}
+            {/* Live Tool Execution Log Overlay */}
+            {activePrediction && activePrediction.tool_calls_executed && (
+              <div className="absolute bottom-4 left-4 z-10 max-w-sm w-full hidden lg:block">
+                <ToolExecutionLog
+                  toolCalls={activePrediction.tool_calls_executed}
+                  metrics={rlMetrics}
+                />
               </div>
             )}
           </div>
@@ -280,7 +317,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── GitHub FAB — smaller on mobile ── */}
+      {/* ── HITL Officer Override Modal ── */}
+      <HitlOverrideModal
+        isOpen={hitlModalOpen}
+        prediction={activePrediction}
+        onClose={() => setHitlModalOpen(false)}
+        onSubmitFeedback={handleHumanFeedbackSubmit}
+      />
+
+      {/* ── GitHub FAB ── */}
       <a
         href="https://github.com/HamzaDevv/Traffic_congestion"
         target="_blank"

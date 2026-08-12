@@ -18,6 +18,12 @@ backend/models/*.pkl
 # macOS
 .DS_Store
 
+# Large Data Files
+jan to may police violation_anonymized791b166.csv
+Banglore_traffic.pdf
+backend/data/*.jsonl
+
 # Editor
 .vscode/
 .idea/
+
