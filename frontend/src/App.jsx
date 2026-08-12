@@ -484,7 +484,7 @@ export default function App() {
     { id: 1, label: 'Validated' },
     { id: 2, label: 'Scored' },
     { id: 3, label: 'Clustered' },
-    { id: 4, label: 'RL Dispatched' },
+    { id: 4, label: 'RL SOP' },
   ]
 
   return (
@@ -534,9 +534,9 @@ export default function App() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* ── Top Navbar ── */}
-        <header className="sticky top-0 z-40 h-[60px] bg-bg-page border-b border-bg-border flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0">
-          {/* Left — Hamburger + Connection Status */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <header className="sticky top-0 z-40 h-[60px] bg-bg-page border-b border-bg-border flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0 gap-2 overflow-hidden">
+          {/* Left — Hamburger + Connection Status + Stage Cascade */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Mobile hamburger */}
             <button
               onClick={() => setSidebarOpen(true)}
@@ -557,12 +557,12 @@ export default function App() {
             </div>
 
             {/* Stage Cascade Toggles */}
-            <div className="hidden lg:flex items-center gap-1 bg-bg-canvas border border-bg-border rounded-lg p-1">
+            <div className="hidden xl:flex items-center gap-1 bg-bg-canvas border border-bg-border rounded-lg p-1 shrink-0">
               {stageLabels.map(stage => (
                 <button
                   key={stage.id}
                   onClick={() => setCascadeStage(stage.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
                     cascadeStage >= stage.id
                       ? 'bg-accent-blue/15 text-accent-blue'
                       : 'text-text-muted hover:text-text-primary hover:bg-bg-hover'
