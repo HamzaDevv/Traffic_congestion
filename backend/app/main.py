@@ -246,6 +246,18 @@ def simulate(req: SimulateRequest):
 # 15-Day Live Complaints Stream Simulation Endpoints
 # ---------------------------------------------------------------------------
 
+def _sanitize_record(item: dict) -> dict:
+    if not isinstance(item, dict):
+        return item
+    clean = {}
+    for k, v in item.items():
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            clean[k] = None
+        else:
+            clean[k] = v
+    return clean
+
+
 @app.get("/api/live_stream/status")
 def get_live_stream_status():
     """Return status of 15-day live complaints stream simulation."""
@@ -279,7 +291,7 @@ def get_live_stream_status():
         "simulated_now": simulated_now,
         "start_dt": state.live_stream_start_dt,
         "end_dt": state.live_stream_end_dt,
-        "current_item": curr_item,
+        "current_item": _sanitize_record(curr_item),
     }
 
 
@@ -329,26 +341,39 @@ def trigger_instant_live_query():
         state.live_stream_index = (state.live_stream_index + 1) % total
 
     ticket_id = f"LIVE_{curr_item.get('id', '999')}_{state.live_stream_index}"
+
+    ps = curr_item.get("police_station")
+    if pd.isna(ps) or not str(ps).strip() or str(ps).lower() == "nan":
+        ps = "Madiwala"
+
+    junc = curr_item.get("junction_name")
+    if pd.isna(junc) or not str(junc).strip() or str(junc).lower() == "nan":
+        junc = "Silk Board Junction"
+
+    sev = curr_item.get("severity_score")
+    if pd.isna(sev) or sev is None:
+        sev = 0.75
+
     req = PredictActionRequest(
         ticket_id=ticket_id,
         latitude=float(curr_item.get("latitude", 12.9172)),
         longitude=float(curr_item.get("longitude", 77.6228)),
-        police_station=str(curr_item.get("police_station", "Madiwala")),
-        junction_name=str(curr_item.get("junction_name", "Silk Board Junction")),
-        severity_score=float(curr_item.get("severity_score", 0.75)),
+        police_station=str(ps),
+        junction_name=str(junc),
+        severity_score=float(sev),
         report_count=1,
     )
 
     prediction_resp = predict_action(req)
 
     res_dict = prediction_resp.model_dump()
-    res_dict["created_datetime"] = curr_item.get("created_datetime", "Just Now")
-    res_dict["vehicle_type"] = curr_item.get("vehicle_type", "CAR")
+    res_dict["created_datetime"] = str(curr_item.get("created_datetime", "Just Now"))
+    res_dict["vehicle_type"] = str(curr_item.get("vehicle_type", "CAR"))
     res_dict["stream_index"] = state.live_stream_index
     res_dict["day_number"] = min(15, max(1, int((state.live_stream_index / max(1, total)) * 15) + 1))
     res_dict["loop_reset_occurred"] = (state.live_stream_index == 0)
 
-    return res_dict
+    return _sanitize_record(res_dict)
 
 
 # ---------------------------------------------------------------------------
