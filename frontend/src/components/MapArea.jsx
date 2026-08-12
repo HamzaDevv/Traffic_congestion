@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import HeatmapLayer from './HeatmapLayer'
 import ClusterMarkers from './ClusterMarkers'
 import TowTruckMarkers from './TowTruckMarkers'
+import LiveQueryMarkers from './LiveQueryMarkers'
 
 // ── Fly-to helper ──
 function FlyTo({ target }) {
@@ -34,13 +35,16 @@ export default function MapArea({
   reports,
   heatmap,
   clusters,
-  showHeatmap,
-  showMarkers,
-  showClusters,
+  showHeatmap = false,
+  showMarkers = false,
+  showClusters = false,
   flyToTarget,
   simulatePin,
   cascadeStage,
   activeTrucks = [],
+  activeQueries = [],
+  onResolveQuery,
+  onSelectQuery,
 }) {
   return (
     <MapContainer
@@ -57,13 +61,20 @@ export default function MapArea({
         maxZoom={19}
       />
 
-      {/* Fly-to on cluster click */}
+      {/* Fly-to on incident selection */}
       <FlyTo target={flyToTarget} />
 
-      {/* ── Layer 1: Heatmap ── */}
+      {/* ── Active Unresolved Live Query Markers (Yet to be fixed, removed when resolved!) ── */}
+      <LiveQueryMarkers
+        activeQueries={activeQueries}
+        onResolveQuery={onResolveQuery}
+        onSelectQuery={onSelectQuery}
+      />
+
+      {/* ── Layer 1: Heatmap (optional) ── */}
       {showHeatmap && <HeatmapLayer data={heatmap} />}
 
-      {/* ── Layer 2: Individual violation markers ── */}
+      {/* ── Layer 2: Raw violation markers (optional) ── */}
       {showMarkers && <ClusterMarkers reports={reports} cascadeStage={cascadeStage} />}
 
       {/* ── Layer 3: DBSCAN Hotspot Zones ── */}

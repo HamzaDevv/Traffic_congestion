@@ -444,6 +444,17 @@ export default function App() {
     }
   }
 
+  // 1-Click Resolve Query Handler (Removes query marker from map!)
+  const handleResolveQuery = useCallback(async (item) => {
+    const ticketId = typeof item === 'string' ? item : item.ticket_id
+    setQueueItems(prev =>
+      prev.map(i => i.ticket_id === ticketId ? { ...i, status: 'RESOLVED', auto_execute: true } : i)
+    )
+    if (activePrediction && activePrediction.ticket_id === ticketId) {
+      setActivePrediction(null)
+    }
+  }, [activePrediction])
+
   // Quick Approve item in queue
   const handleApproveQueueItem = async (item) => {
     await postHumanFeedback({
@@ -455,7 +466,7 @@ export default function App() {
       incident_state: { severity_score: item.severity_score, assigned_unit: item.assigned_unit }
     })
 
-    setQueueItems(prev => prev.map(i => i.ticket_id === item.ticket_id ? { ...i, status: 'APPROVED', auto_execute: true } : i))
+    setQueueItems(prev => prev.map(i => i.ticket_id === item.ticket_id ? { ...i, status: 'RESOLVED', auto_execute: true } : i))
 
     if (item.action === 'DISPATCH' || item.action === 'ESCALATE') {
       handleDispatchTowTruck(item)
@@ -469,13 +480,17 @@ export default function App() {
     await postHumanFeedback(feedbackData)
     setQueueItems(prev => prev.map(i => i.ticket_id === feedbackData.ticket_id ? {
       ...i,
-      status: feedbackData.is_approved ? 'APPROVED' : 'OVERRIDDEN',
+      status: 'RESOLVED',
       officer_action: feedbackData.officer_action
     } : i))
 
     const updated = await fetchRlMetrics()
     setRlMetrics(updated)
   }
+
+  const activeUnresolvedQueries = queueItems.filter(i =>
+    i.status === 'PENDING' || i.status === 'AUTONOMOUS' || i.status === 'DISPATCH' || i.status === 'ESCALATE'
+  )
 
   const pendingHitlCount = queueItems.filter(i => !i.auto_execute || i.action === 'ESCALATE' || i.status === 'PENDING').length
 
@@ -657,13 +672,16 @@ export default function App() {
               reports={reports}
               heatmap={heatmap}
               clusters={clusters}
-              showHeatmap={cascadeStage >= 2}
-              showMarkers={true}
+              showHeatmap={false}
+              showMarkers={false}
               showClusters={cascadeStage >= 3}
               cascadeStage={cascadeStage}
               flyToTarget={flyToTarget}
               simulatePin={simulatePin}
               activeTrucks={activeTrucks}
+              activeQueries={activeUnresolvedQueries}
+              onResolveQuery={handleResolveQuery}
+              onSelectQuery={handleSelectQueueItem}
             />
 
             {/* Map Legend */}
