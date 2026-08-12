@@ -12,7 +12,7 @@ The **Smart City Parking Intelligence & Autonomous Dispatch System** transforms 
 
 1. **Stage 1 (Gatekeeper ML)**: Filters out invalid, noisy, or spam citizen complaints.
 2. **Stage 2 (Impact Quantifier ML)**: Assigns a continuous severity score ($0.0 - 1.0$) based on vehicle weight, location type, peak hour, and traffic disruption potential.
-3. **Stage 3 (Hotspot Clusterer DBSCAN)**: Groups approved high-severity violations into dispatch-ready spatial clusters ($80\text{m}$ radii centroids).
+3. **Stage 3 (Hotspot Clusterer DBSCAN)**: Groups approved high-severity violations into dispatch-ready spatial clusters (80m radii centroids).
 4. **Stage 4 (Autonomous RL SOP Dispatcher - `Qwen 2.5 0.5B`)**: Evaluates live incident telemetry, executes 5 real-time agentic tools (including Dijkstra graph routing and Green Corridor signal overrides), executes routine decisions autonomously ($P \ge 0.80$), and triggers a Human-in-the-Loop (HITL) Officer Override Modal for continuous DPO alignment.
 
 ---
@@ -113,7 +113,7 @@ The **Smart City Parking Intelligence & Autonomous Dispatch System** transforms 
 
 ### D. Stage 3: Hotspot Clusterer (DBSCAN Spatial Haversine)
 * **Objective**: Aggregates individual approved complaints into enforcement zones.
-* **Algorithm**: Density-Based Spatial Clustering of Applications with Noise (DBSCAN) using Haversine metric ($\text{eps} = 80\text{m}$, $\text{min\_samples} = 3$).
+* **Algorithm**: Density-Based Spatial Clustering of Applications with Noise (DBSCAN) using Haversine metric (`eps = 80m`, `min_samples = 3`).
 * **Cluster Output**: Generates cluster centroids (lat/lon), cluster radii ($m$), report density counts, average severity scores, and top police station jurisdiction rankings.
 
 ### E. Stage 4: Autonomous RL SOP Dispatcher (`Qwen 2.5 0.5B`)
