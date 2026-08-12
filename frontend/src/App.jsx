@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Sun, Moon, Bell, Hexagon, Menu, X, ShieldAlert, Cpu, Truck, Zap, Activity } from 'lucide-react'
+import { Sun, Moon, Bell, Hexagon, Menu, X, ShieldAlert, Cpu, Truck, Zap, Activity, Radio, BarChart3, Filter } from 'lucide-react'
 import MapArea from './components/MapArea'
 import Sidebar from './components/Sidebar'
 import TimeSlider from './components/TimeSlider'
 import HitlOverrideModal from './components/HitlOverrideModal'
 import ToolExecutionLog from './components/ToolExecutionLog'
 import LiveStreamBar from './components/LiveStreamBar'
+import HistoricalFilterPanel from './components/HistoricalFilterPanel'
 import { useData } from './hooks/useData'
 import { predictAction, postHumanFeedback, fetchRlMetrics, STATION_COORDS, generateDijkstraWaypoints, fetchLiveStreamStatus, controlLiveStream, triggerInstantLiveQuery } from './api'
 
@@ -120,9 +121,19 @@ const INITIAL_QUEUE_SEED = [
   }
 ]
 
+const DEFAULT_HISTORICAL_FILTERS = {
+  dateRange: 'ALL',
+  hourMin: 0,
+  hourMax: 23,
+  severityRange: 'ALL',
+  vehicleType: 'ALL',
+  showHeatmap: true,
+}
+
 export default function App() {
-  const [hourMin, setHourMin] = useState(0)
-  const [hourMax, setHourMax] = useState(23)
+  const [viewMode, setViewMode] = useState('LIVE') // 'LIVE' or 'HISTORICAL'
+  const [historicalFilters, setHistoricalFilters] = useState(DEFAULT_HISTORICAL_FILTERS)
+
   const [cascadeStage, setCascadeStage] = useState(4)
   const [flyToTarget, setFlyToTarget] = useState(null)
   const [simulatePin, setSimulatePin] = useState(null)
@@ -151,7 +162,7 @@ export default function App() {
   })
   const [isProcessingInstant, setIsProcessingInstant] = useState(false)
 
-  const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(hourMin, hourMax, cascadeStage >= 1)
+  const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(historicalFilters)
 
   useEffect(() => {
     fetchRlMetrics().then(data => setRlMetrics(data)).catch(() => {})
@@ -622,6 +633,34 @@ export default function App() {
               </div>
             )}
 
+            {/* View Mode Switcher Button: LIVE ACTIVE vs HISTORICAL ARCHIVE */}
+            <div className="flex items-center bg-bg-canvas border border-bg-border rounded-xl p-1 shrink-0">
+              <button
+                onClick={() => setViewMode('LIVE')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  viewMode === 'LIVE'
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
+                title="Live Active Mode: Shows only active unresolved live queries that remove when resolved!"
+              >
+                <Radio size={13} className={viewMode === 'LIVE' ? 'animate-pulse text-rose-400' : ''} />
+                <span className="hidden sm:inline">Live Active</span>
+              </button>
+              <button
+                onClick={() => setViewMode('HISTORICAL')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  viewMode === 'HISTORICAL'
+                    ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/40 shadow-sm'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
+                title="Historical Past Data Mode: View 5-month past records with date, time, severity & vehicle filters!"
+              >
+                <BarChart3 size={13} />
+                <span className="hidden sm:inline">Past Data Archive</span>
+              </button>
+            </div>
+
             <LiveClock />
             <ThemeToggle />
 
@@ -643,6 +682,17 @@ export default function App() {
           onTriggerInstantQuery={handleTriggerInstantLiveQuery}
           isProcessingInstant={isProcessingInstant}
         />
+
+        {/* ── Historical Data Archive Filters Panel (Visible in HISTORICAL mode) ── */}
+        {viewMode === 'HISTORICAL' && (
+          <HistoricalFilterPanel
+            filters={historicalFilters}
+            onChangeFilters={setHistoricalFilters}
+            onResetFilters={() => setHistoricalFilters(DEFAULT_HISTORICAL_FILTERS)}
+            totalMatchingReports={reports.length}
+            onClose={() => setViewMode('LIVE')}
+          />
+        )}
 
         {/* ── Main Content Area ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -672,14 +722,14 @@ export default function App() {
               reports={reports}
               heatmap={heatmap}
               clusters={clusters}
-              showHeatmap={false}
-              showMarkers={false}
+              showHeatmap={viewMode === 'HISTORICAL' && historicalFilters.showHeatmap}
+              showMarkers={viewMode === 'HISTORICAL'}
               showClusters={cascadeStage >= 3}
               cascadeStage={cascadeStage}
               flyToTarget={flyToTarget}
               simulatePin={simulatePin}
               activeTrucks={activeTrucks}
-              activeQueries={activeUnresolvedQueries}
+              activeQueries={viewMode === 'LIVE' ? activeUnresolvedQueries : []}
               onResolveQuery={handleResolveQuery}
               onSelectQuery={handleSelectQueueItem}
             />

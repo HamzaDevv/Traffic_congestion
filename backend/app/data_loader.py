@@ -255,6 +255,7 @@ def load_and_process():
     scored["id"] = df.index.astype(str)
     scored["is_approved"] = is_approved
     scored["severity_score"] = np.round(severity, 4)
+    scored["created_datetime"] = df["created_datetime"].astype(str)
 
     # Keep hour from engineered features
     scored["hour"] = feat_df["hour_of_day"].values

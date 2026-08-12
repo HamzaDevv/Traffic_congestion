@@ -77,39 +77,65 @@ def get_reports(
     approved_only: bool = Query(True, description="Return only approved violations"),
     hour_min: int = Query(0, ge=0, le=23),
     hour_max: int = Query(23, ge=0, le=23),
-    limit: int = Query(2000, ge=1, le=5000),
+    severity_min: float = Query(0.0, ge=0.0, le=1.0),
+    severity_max: float = Query(1.0, ge=0.0, le=1.0),
+    vehicle_type: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    limit: int = Query(2500, ge=1, le=5000),
 ):
-    """Return individual violation markers for the map."""
-    import math as _math
+    """Return individual violation markers for the map with full date/time/severity filtering."""
     df = state.scored_df
     if df is None:
         return []
 
     mask = (df["hour"] >= hour_min) & (df["hour"] <= hour_max)
+    mask &= (df["severity_score"] >= severity_min) & (df["severity_score"] <= severity_max)
+
     if approved_only:
         mask &= df["is_approved"] == 1
 
+    if vehicle_type and vehicle_type.upper() != "ALL":
+        mask &= df["vehicle_type"].str.upper().str.contains(vehicle_type.upper())
+
+    if start_date and "created_datetime" in df.columns:
+        mask &= df["created_datetime"] >= start_date
+
+    if end_date and "created_datetime" in df.columns:
+        mask &= df["created_datetime"] <= end_date + "T23:59:59"
+
     filtered = df[mask].head(limit).copy()
-    filtered = filtered.where(filtered.notna(), None)
     records = filtered.to_dict(orient="records")
-    def sanitize(v):
-        if isinstance(v, float) and (_math.isnan(v) or _math.isinf(v)):
-            return None
-        return v
-    return [{k: sanitize(v) for k, v in row.items()} for row in records]
+    return [_sanitize_record(row) for row in records]
 
 
 @app.get("/api/heatmap")
 def get_heatmap(
     hour_min: int = Query(0, ge=0, le=23),
     hour_max: int = Query(23, ge=0, le=23),
+    severity_min: float = Query(0.0, ge=0.0, le=1.0),
+    severity_max: float = Query(1.0, ge=0.0, le=1.0),
+    vehicle_type: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
 ):
-    """Return [[lat, lon, severity], ...] for Leaflet.heat."""
+    """Return [[lat, lon, severity], ...] for Leaflet.heat with filtering."""
     df = state.scored_df
     if df is None:
         return []
 
     mask = (df["is_approved"] == 1) & (df["hour"] >= hour_min) & (df["hour"] <= hour_max)
+    mask &= (df["severity_score"] >= severity_min) & (df["severity_score"] <= severity_max)
+
+    if vehicle_type and vehicle_type.upper() != "ALL":
+        mask &= df["vehicle_type"].str.upper().str.contains(vehicle_type.upper())
+
+    if start_date and "created_datetime" in df.columns:
+        mask &= df["created_datetime"] >= start_date
+
+    if end_date and "created_datetime" in df.columns:
+        mask &= df["created_datetime"] <= end_date + "T23:59:59"
+
     rows = df[mask][["latitude", "longitude", "severity_score"]].dropna()
     return [[round(float(r[0]), 6), round(float(r[1]), 6), round(float(r[2]), 4)]
             for r in rows.values if all(v == v for v in r)]
