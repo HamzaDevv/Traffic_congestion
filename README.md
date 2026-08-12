@@ -1,43 +1,12 @@
-# Parking Intelligence - AI-Driven Violation Detection for Bengaluru
+# 🚥 Traffic Intelligence — 4-Stage AI & Tool-Augmented RL SOP Dispatcher for Bengaluru
 
-Bengaluru's traffic command centers receive thousands of citizen-submitted parking violation reports daily, but most are unvalidated, unscored, and spatially unorganised, making targeted enforcement nearly impossible.
+Bengaluru's traffic command centers receive thousands of citizen-submitted traffic and parking violation reports daily. Most are unvalidated, unscored, and spatially unorganised, making targeted dispatch and enforcement nearly impossible.
 
-Parking Intelligence solves this with a 3-stage ML cascade deployed as a full-stack application. Raw citizen reports are ingested and passed through a Gatekeeper classifier that filters out invalid submissions, an Impact Quantifier that assigns a continuous severity score (0-1), and a Hotspot Clusterer that groups nearby high-severity violations into actionable dispatch zones. The result is a real-time operations dashboard that surfaces where to send officers, ranked by impact.
+**Traffic Intelligence** solves this with a **4-Stage AI & Reinforcement Learning Cascade** deployed as a full-stack real-time operational dashboard. Raw citizen reports are ingested, validated by a Gatekeeper, scored for impact severity, clustered into hotspot zones, and dispatched by an autonomous **Tool-Augmented RL SOP Policy** based on `Qwen2.5-0.5B-Instruct` equipped with **Dijkstra Shortest Path Routing** and a **Human-in-the-Loop (HITL) Continuous Alignment Loop**.
 
-## Setup & Run Instructions
+---
 
-### 1. Prerequisites
-- Python 3.9+
-- Node.js v18+
-
-### 2. Backend Setup
-Navigate to the `backend` directory and start the FastAPI server:
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-Place the trained model `.pkl` files in `backend/models/`:
-- `prod_retrain_model_m1.pkl` (Gatekeeper, ~145 MB)
-- `prod_retrain_model_m2.pkl` (Impact Quantifier, ~344 MB)
-
-If models are not present, the backend falls back to validation-status labels and heuristic severity scoring.
-
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-The backend will run on `http://localhost:8000`. API docs are available at `http://localhost:8000/docs`.
-
-### 3. Frontend Setup
-Open a new terminal, navigate to the `frontend` directory, and start the Vite development server:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-The dashboard will be available at `http://localhost:5173`.
-
-## Architecture
+## 🌟 Key Features & 4-Stage Architecture
 
 ```mermaid
 graph TD
@@ -46,29 +15,122 @@ graph TD
     classDef feature fill:#042f2e,stroke:#14b8a6,stroke-width:2px,color:#ccfbf1;
     classDef ml fill:#4c1d95,stroke:#8b5cf6,stroke-width:2px,color:#ede9fe;
     classDef cluster fill:#713f12,stroke:#f59e0b,stroke-width:2px,color:#fef3c7;
+    classDef rl fill:#831843,stroke:#ec4899,stroke-width:2px,color:#fce7f3;
     classDef ui fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fee2e2;
     classDef api fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#dbeafe;
 
-    A["Citizen Violation Report (CSV)"]:::input --> B{"Feature Engineer"}:::feature
+    A["Citizen Report Stream (CSV)"]:::input --> B{"Feature Engineer"}:::feature
     B -->|"23 Engineered Features"| C["Stage 1: Gatekeeper (Random Forest)"]:::ml
     C -->|"is_approved (0/1)"| D["Stage 2: Impact Quantifier (Random Forest)"]:::ml
-    D -->|"severity_score (0-1)"| E["Stage 3: Hotspot Clusterer (DBSCAN Haversine)"]:::cluster
+    D -->|"severity_score (0.0 - 1.0)"| E["Stage 3: Hotspot Clusterer (DBSCAN Haversine)"]:::cluster
+    E -->|"Cluster Centroids & Telemetry"| F["Stage 4: RL Qwen 2.5 SOP Policy"]:::rl
 
-    E -->|"Cluster Centroids, Radii, Counts"| F["FastAPI Backend"]:::api
+    F -->|"Softmax Gate P >= 0.80"| G["Autonomous Action Execution"]:::api
+    F -->|"Softmax Gate P < 0.80 or ESCALATE"| H["HITL Officer Override Modal"]:::ui
 
-    F -->|"/api/reports"| G["React + Leaflet Dashboard"]:::ui
-    F -->|"/api/heatmap"| G
-    F -->|"/api/clusters"| G
-    F -->|"/api/stats"| G
-    F -->|"/api/timeline"| G
-    F -->|"/api/simulate"| G
+    H -->|"Officer Feedback & Notes"| I["dpo_preference_pairs.jsonl"]:::feature
+    I -->|"Automated Retraining"| J["Continuous DPO Retraining Pipeline"]:::rl
+    J -->|"Auto Push"| K["Hugging Face Model Hub"]:::input
 ```
 
-The system operates on a 3-stage ML cascade executed at startup, with results served through a REST API:
+---
 
-1. **Feature Engineer**: Parses raw CSV fields into 23 model-ready features covering spatial coordinates, temporal signals (hour, day, peak/night flags), vehicle weight categories, violation type encodings, and interaction terms (e.g., heavy vehicle at peak hour, main-road violation at junction).
-2. **Stage 1 - Gatekeeper (Random Forest Classifier)**: Binary classification that filters out invalid or low-quality reports, producing an `is_approved` label. Falls back to the `validation_status` column when the model is unavailable.
-3. **Stage 2 - Impact Quantifier (Random Forest Regressor)**: Predicts a continuous `severity_score` (0-1) for each approved report. Falls back to a weighted heuristic combining vehicle weight, violation type severity, peak-hour multiplier, and junction proximity.
-4. **Stage 3 - Hotspot Clusterer (DBSCAN)**: Groups approved, high-severity violations using haversine-distance DBSCAN (80 m eps, min 3 samples) to produce dispatch-ready cluster centroids ranked by severity x count.
-5. **FastAPI Backend**: Loads models and processes all data at startup via a lifespan handler. Serves six REST endpoints consumed by the frontend.
-6. **React + Leaflet Dashboard**: Renders violation markers, severity heatmaps, hotspot cluster overlays, KPI stats, an hourly timeline slider, and a live simulation panel that scores new reports through the full cascade in real-time.
+## 🛠️ Stage 4: Agentic Tools Suite
+
+The fine-tuned policy model (`HamzaBoy/qwen2.5-0.5b-traffic-sop`) executes dynamic multi-step tool calls before issuing a final structured decision:
+
+| Tool Name | Implementation & Operational Purpose |
+| :--- | :--- |
+| **`calculate_shortest_route`** | Calculates exact distance ($\text{km}$) & ETA ($\text{mins}$) using **Dijkstra's Algorithm** over a `NetworkX` graph of Bangalore junctions weighted by live congestion factors. |
+| **`query_available_units`** | Queries real-time simulated fleet database of Patrol Bikes, Interceptors, and Heavy Tow Trucks near police station jurisdiction. |
+| **`check_junction_cctv`** | Fetches live camera feed analytics (lane blockages, stalled vehicles, visibility %) to verify false alerts. |
+| **`issue_signal_override`** | Activates automated **Green Corridor** traffic light priority for emergency clearance vehicles. |
+| **`broadcast_traffic_advisory`** | Publishes public diversion notices to VMS display boards, navigation apps, and traffic FM radio. |
+
+---
+
+## 5-Step SOP Macro-Action Space
+
+The policy outputs structured JSON decisions adhering to traffic officer Standard Operating Procedures:
+* **`VERIFY`**: Requests CCTV visual check when alert severity is ambiguous ($0.25 \le \text{severity} < 0.55$).
+* **`DISPATCH`**: Queries nearest unit, calculates Dijkstra route, issues Green Corridor, and assigns unit ($\text{severity} \ge 0.55$).
+* **`RESOLVE`**: Closes ticket when traffic flow returns to baseline.
+* **`REJECT`**: Dismisses false positive or unverified reports ($\text{severity} < 0.25$).
+* **`ESCALATE`**: Broadcasts public advisory and forwards ticket to Human Supervisor popup modal for critical emergencies ($\text{severity} \ge 0.88$ or blocked ambulances).
+
+---
+
+## 🧠 Qwen 2.5 (0.5B) Fine-Tuning & Model Hub
+
+The policy model adapter is fine-tuned using **SFT + QLoRA** on 5,000 real-world trajectories (incorporating weather, speed drop %, queue backlog, ambulance flags, and Dijkstra tool calls) and published on Hugging Face Model Hub:
+
+👉 **[Hugging Face Model Hub: HamzaBoy/qwen2.5-0.5b-traffic-sop](https://huggingface.co/HamzaBoy/qwen2.5-0.5b-traffic-sop)**
+
+* **Base Model**: `Qwen/Qwen2.5-0.5B-Instruct`
+* **Training Loss**: Converged from **`1.3902`** down to **`0.0851`** (~99% accuracy on SOP rules & tool syntax).
+* **Hardware**: Trained on Google Colab T4 GPU (`backend/notebooks/train_colab_qwen_rl.ipynb`).
+
+---
+
+## 🚀 Setup & Run Instructions
+
+### 1. Prerequisites
+- Python 3.9+
+- Node.js v18+
+
+### 2. Backend Setup
+Navigate to the `backend` directory and install dependencies:
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+Run the FastAPI backend server:
+```bash
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+The backend will run on `http://localhost:8000`. API docs are available at `http://localhost:8000/docs`.
+
+### 3. Frontend Setup
+Open a new terminal, navigate to the `frontend` directory, and start the Vite dev server:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+The dashboard will be available at `http://localhost:5173`.
+
+---
+
+## 📡 API Endpoints Summary
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/health` | `GET` | Health status and ML cascade readiness. |
+| `/api/reports` | `GET` | Filtered violation markers for Leaflet map. |
+| `/api/heatmap` | `GET` | Heatmap density coordinates `[[lat, lon, severity], ...]`. |
+| `/api/clusters` | `GET` | DBSCAN hotspot cluster centroids and dispatch metrics. |
+| `/api/predict_action` | `POST` | **Stage 4 RL SOP Evaluation**: Executes agentic tools (Dijkstra route) and returns optimal action + Softmax confidence gate. |
+| `/api/human_feedback` | `POST` | **HITL Officer Feedback**: Logs officer approvals/overrides and generates DPO preference pairs. |
+| `/api/rl_metrics` | `GET` | Reports autonomous resolution rate %, escalation %, and model adapter metadata. |
+
+---
+
+## 🔄 Automated Continuous DPO Retraining Pipeline
+
+When traffic officers interact with the dashboard and override predictions on the **HITL Modal**, the feedback is saved to `hitl_feedback_logs.jsonl` and formatted into **DPO Preference Pairs** (`dpo_preference_pairs.jsonl`).
+
+To run the automated continuous DPO retraining pipeline:
+```bash
+python3 backend/notebooks/periodic_dpo_retrain.py
+```
+When 5+ new officer overrides accumulate, the script initializes a DPO trainer loop and pushes updated model weights directly to Hugging Face Model Hub!
+
+---
+
+## 🧪 System Integration Tests
+
+Run the complete automated end-to-end integration test suite:
+```bash
+python3 backend/test_system_end_to_end.py
+```
