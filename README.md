@@ -55,12 +55,21 @@ graph TD
 4. **📻 15-Day Live Complaints Stream Simulation Engine (`LiveStreamBar.jsx`)**:
    - Continuously streams complaints from the final 15 days of dataset records (`2024-03-24` to `2024-04-08`).
    - Automatically loops back to Day 1 once the 15-day timeframe concludes.
-   - Interactive playback bar with speed multipliers (`1x`, `10x`, `60x`, `300x`), play/pause toggle, and reset controls.
+   - Playback control bar with speed multipliers (`1x`, `10x`, `60x`, `300x`), play/pause toggle, and reset controls.
 
 5. **⚡ Instant Live Query Handling Button (`⚡ Live Simulate Query`)**:
    - Instantly pulls the next pending complaint from the live queue right now.
-   - Executes the 4-Stage cascade analysis (Gatekeeper → Quantifier → Clusterer → Qwen RL SOP Dispatcher).
-   - Pans/flies the Leaflet map to the incident spot, displays real-time tool execution logs, and dispatches a heavy tow truck or opens the HITL review portal.
+   - Executes the 4-Stage cascade analysis (Gatekeeper → Quantifier → Clusterer → Qwen RL SOP Dispatcher with tool calls).
+   - Pans/flies Leaflet map to the incident spot, displays real-time tool logs, and dispatches a heavy tow truck or opens HITL review portal.
+
+6. **🎯 Live Active Map Mode & Auto-Removal on Resolution (`LiveQueryMarkers.jsx`)**:
+   - Displays **ONLY active unresolved live queries** that are yet to be fixed, keeping the map clean and hyper-focused.
+   - Interactive 1-click **`✓ Resolve & Clear`** popup action immediately clears resolved incidents from the map.
+   - Automatic removal when an officer approves/overrides a ticket or when an assigned Tow Truck reaches `100% ARRIVED` at the incident scene.
+
+7. **📊 Past Data Archive Mode Switcher & Advanced Filters (`HistoricalFilterPanel.jsx`)**:
+   - Header toggle button (`⚡ Live Active` vs `📊 Past Data Archive`).
+   - Advanced multi-dimensional filtering across all 5 months of historical records: **Date Horizon** (All 5 Months, Last 30 Days, Last 15 Days, Nov 23 - Apr 24), **Time of Day Slider** (`00:00-23:00`), **Severity Risk Level**, **Vehicle Category**, and **Heatmap Density Layer**.
 
 ---
 
@@ -136,9 +145,12 @@ The dashboard will be available at `http://localhost:5173`.
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
 | `/health` | `GET` | Health status and ML cascade readiness. |
-| `/api/reports` | `GET` | Filtered violation markers for Leaflet map. |
+| `/api/reports` | `GET` | Filtered violation markers with date, time, severity & vehicle type filters. |
 | `/api/heatmap` | `GET` | Heatmap density coordinates `[[lat, lon, severity], ...]`. |
 | `/api/clusters` | `GET` | DBSCAN hotspot cluster centroids and dispatch metrics. |
+| `/api/live_stream/status` | `GET` | Returns 15-day live complaints stream status, clock, and current item. |
+| `/api/live_stream/control` | `POST` | Controls live playback (play, pause, reset loop, set speed multiplier). |
+| `/api/live_stream/trigger_instant` | `POST` | **Instant Live Query Handle**: Instantly pulls next complaint, executes 4-Stage cascade analysis & tools, and updates queue. |
 | `/api/predict_action` | `POST` | **Stage 4 RL SOP Evaluation**: Executes agentic tools (Dijkstra route) and returns optimal action + Softmax confidence gate. |
 | `/api/human_feedback` | `POST` | **HITL Officer Feedback**: Logs officer approvals/overrides and generates DPO preference pairs. |
 | `/api/rl_metrics` | `GET` | Reports autonomous resolution rate %, escalation %, and model adapter metadata. |

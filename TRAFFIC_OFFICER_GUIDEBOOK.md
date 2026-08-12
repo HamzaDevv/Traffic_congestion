@@ -145,11 +145,39 @@ During Stage 4 evaluation, the AI model dynamically executes up to 5 real-time *
 
 ## 7. Operating the Command Dashboard & Live Simulation
 
-Control Center Officers interact with the platform via the React + Leaflet Dashboard:
-* **Interactive Map View**: Displays individual violation markers, continuous disruption heatmaps, and DBSCAN hotspot cluster circles.
-* **Hourly Timeline Slider**: Slide through hours of the day ($00:00 - 23:00$) to observe temporal congestion shifts and peak hour clusters.
-* **Layer Toggles**: Toggle individual map layers (Heatmap, Hotspots, Violations, Centroids).
-* **Live Simulation Panel**: Officers can manually enter latitude, longitude, vehicle type, location type, and violation tags to run a simulated report through the full 4-stage AI cascade in real time.
+Control Center Officers interact with the platform via the React + Leaflet Command Dashboard:
+
+### 7.1 Dashboard Operating Modes
+The top header bar features a **Mode Switcher** allowing dispatchers to toggle between real-time operational response and historical analytics:
+* **`⚡ Live Active Mode`** *(Default)*:
+  - Displays **ONLY active unresolved live queries** that are currently pending enforcement.
+  - Hides background static historical clutter so control room screens stay clean and hyper-focused.
+  - Incidents automatically disappear from the map when resolved by an officer or when an assigned Tow Truck completes dispatch (`ARRIVED`).
+* **`📊 Past Data Archive Mode`**:
+  - Unlocks full historical spatial analytics across the 5-month dataset.
+  - Displays historical markers, heatmaps, and DBSCAN hotspot cluster circles.
+
+### 7.2 15-Day Live Complaints Stream Engine
+* **Continuous Streaming**: Streams citizen complaints from the final 15 days of dataset records (`2024-03-24` to `2024-04-08`).
+* **Playback Controls**: Adjust simulation speed (`1x`, `10x`, `60x`, `300x`), pause/play stream, or reset loop back to Day 1.
+* **Auto-Loop Reset**: Automatically restarts the 15-day cycle upon reaching Day 15.
+
+### 7.3 Instant Live Query Trigger Button (`⚡ Live Simulate Query`)
+* Located prominently in the top control bar.
+* Clicking **`⚡ Live Simulate Query`** instantly pulls the top pending complaint from the queue as if received right now.
+* Pans/flies the map to the incident spot, displays real-time tool execution logs, and automatically dispatches a heavy tow truck or opens the HITL review portal.
+
+### 7.4 1-Click Marker Resolution & Clearance
+* **Map Popup Resolution**: Every active incident marker features a **`✓ Resolve & Clear`** button in its popup.
+* **Auto-Removal**: Clicking "Resolve & Clear" or approving a ticket in the HITL Queue immediately removes its marker from the map.
+
+### 7.5 Past Data Archive Filters (`HistoricalFilterPanel.jsx`)
+When operating in **`📊 Past Data Archive`** mode, officers can apply multi-dimensional filters:
+* 📅 **Date Horizon**: Filter by `All 5 Months`, `Last 30 Days`, `Last 15 Days`, or specific months (`Nov 2023` to `Apr 2024`).
+* ⏰ **Time of Day**: Filter violation hours using dual range sliders ($00:00 - 23:00$).
+* ⚠️ **Severity Level**: Filter by `Critical (>75%)`, `High (>50%)`, `Moderate (25-50%)`, or `Low (<25%)`.
+* 🚗 **Vehicle Category**: Filter by `Buses & Heavy Trucks`, `Autos`, `Cars`, or `Two Wheelers`.
+* 🔥 **Heatmap Layer**: Toggle continuous disruption density layer.
 
 ---
 
