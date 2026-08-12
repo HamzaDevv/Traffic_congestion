@@ -18,10 +18,13 @@ backend/models/*.pkl
 # macOS
 .DS_Store
 
-# Large Data Files
+# Large Data & Checkpoint Files
 jan to may police violation_anonymized791b166.csv
 Banglore_traffic.pdf
 backend/data/*.jsonl
+dpo_quick_output/
+dpo_test_output/
+
 
 # Editor
 .vscode/
