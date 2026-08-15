@@ -96,17 +96,15 @@ def _engineer_features(df: pd.DataFrame, train_df: pd.DataFrame | None = None) -
         if col in df.columns:
             df[col] = df[col].fillna("unknown").astype(str)
 
-    # Temporal features
-    df["created_datetime"] = pd.to_datetime(df["created_datetime"], format="mixed")
-    if df["created_datetime"].dt.tz is None:
-        df["created_datetime"] = df["created_datetime"].dt.tz_localize("UTC")
+    # Temporal features (fast vector parsing)
+    df["created_datetime"] = pd.to_datetime(df["created_datetime"], errors="coerce", utc=True)
     local = df["created_datetime"].dt.tz_convert("Asia/Kolkata")
-    df["hour_of_day"] = local.dt.hour
-    df["day_of_week"] = local.dt.dayofweek
+    df["hour_of_day"] = local.dt.hour.fillna(12).astype(int)
+    df["day_of_week"] = local.dt.dayofweek.fillna(0).astype(int)
     df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
-    df["is_peak_hour"] = local.dt.hour.isin([8, 9, 10, 11, 17, 18, 19]).astype(int)
-    df["is_night"] = local.dt.hour.isin([22, 23, 0, 1, 2, 3, 4, 5]).astype(int)
-    df["month"] = local.dt.month
+    df["is_peak_hour"] = df["hour_of_day"].isin([8, 9, 10, 11, 17, 18, 19]).astype(int)
+    df["is_night"] = df["hour_of_day"].isin([22, 23, 0, 1, 2, 3, 4, 5]).astype(int)
+    df["month"] = local.dt.month.fillna(3).astype(int)
 
     # Vehicle category
     df["vehicle_weight_category"] = df["vehicle_type"].apply(_get_weight_category)
