@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, Zap, Calendar, Gauge, Radio, RefreshCw } from '
 
 export default function LiveStreamBar({
   streamStatus,
+  dayComplaintsCount,
   onTogglePlay,
   onReset,
   onChangeSpeed,
@@ -47,6 +48,8 @@ export default function LiveStreamBar({
         <div className="flex items-center gap-2 font-mono text-text-primary bg-bg-page border border-bg-border px-2.5 py-1 rounded-lg">
           <Calendar size={14} className="text-accent-yellow" />
           <span className="font-bold text-accent-yellow">Day {day_number} / 15</span>
+          <span className="text-text-muted">|</span>
+          <span className="text-accent-blue font-bold">{(dayComplaintsCount || 1293).toLocaleString()} Active Complaints</span>
           <span className="text-text-muted">|</span>
           <span className="text-text-secondary">{formatSimulatedTime(simulated_now)}</span>
         </div>

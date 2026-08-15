@@ -8,7 +8,7 @@ const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => {
 })
 
 export default function TimeSlider({ timeline, onRangeChange }) {
-  const [currentHour, setCurrentHour] = useState(23)
+  const [currentHour, setCurrentHour] = useState(18)
   const [playing, setPlaying] = useState(false)
   const [mode, setMode] = useState('live') // 'live' | 'playback'
   const [speed, setSpeed] = useState(1) // 1, 2, 5
@@ -16,7 +16,7 @@ export default function TimeSlider({ timeline, onRangeChange }) {
 
   // Report selected range to parent
   useEffect(() => {
-    if (mode === 'all') {
+    if (mode === 'live') {
       onRangeChange(0, 23)
     } else {
       onRangeChange(currentHour, currentHour)

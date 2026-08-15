@@ -713,6 +713,7 @@ export default function App() {
         {/* ── 15-Day Live Complaints Streaming Bar ── */}
         <LiveStreamBar
           streamStatus={streamStatus}
+          dayComplaintsCount={stats?.total_reports || reports.length}
           onTogglePlay={handleToggleStreamPlay}
           onReset={handleResetStream}
           onChangeSpeed={handleChangeStreamSpeed}
