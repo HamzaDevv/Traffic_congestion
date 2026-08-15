@@ -89,9 +89,11 @@ export const fetchDayQueue = async (dayNumber = 1) => {
     const res = await api.get('/api/live_stream/day_queue', { params: { day_number: dayNumber } })
     return res.data
   } catch (err) {
-    const sampleStations = ['Shivajinagar', 'Upparpet', 'Malleshwaram', 'Cubbon Park', 'Madiwala', 'Indiranagar', 'Bellandur']
+    const sampleStations = ['Shivajinagar', 'Upparpet', 'Malleshwaram', 'Cubbon Park', 'Madiwala', 'Indiranagar', 'Bellandur', 'Koramangala']
     const dayItems = []
-    const count = 4 + (dayNumber % 3)
+    const count = 5 + (dayNumber % 3)
+
+    // 1. Actionable items
     for (let i = 0; i < count; i++) {
       const st = sampleStations[(dayNumber + i) % sampleStations.length]
       const coords = STATION_COORDS[st] || [12.9716, 77.5946]
@@ -106,6 +108,7 @@ export const fetchDayQueue = async (dayNumber = 1) => {
         latitude: coords[0] + (Math.sin(i + dayNumber) * 0.012),
         longitude: coords[1] + (Math.cos(i + dayNumber) * 0.012),
         severity_score: sev,
+        vehicle_type: i % 2 === 0 ? 'CAR' : 'MOTOR CYCLE',
         action: act,
         confidence: isEscalate ? 0.76 : 0.92,
         auto_execute: !isEscalate,
@@ -118,6 +121,41 @@ export const fetchDayQueue = async (dayNumber = 1) => {
         ]
       })
     }
+
+    // 2. Filtered out / Rejected items by M1 Gatekeeper
+    const rejectReasons = [
+      "M1 Gatekeeper: Legitimate designated parking bay, zero lane obstruction.",
+      "M1 Gatekeeper: Stationary emergency/utility vehicle with valid permit.",
+      "M1 Gatekeeper: Off-street private driveway, no arterial traffic blockage.",
+      "M1 Gatekeeper: Duplicate citizen report already addressed in previous cycle.",
+      "M1 Gatekeeper: Unclear image/license metadata below confidence threshold.",
+      "M1 Gatekeeper: Loading/unloading zone permitted during off-peak hours.",
+    ]
+
+    for (let j = 0; j < 5; j++) {
+      const st = sampleStations[(dayNumber + j + 3) % sampleStations.length]
+      const coords = STATION_COORDS[st] || [12.9716, 77.5946]
+      dayItems.push({
+        ticket_id: `REJ_DAY${dayNumber}_${500 + j}`,
+        police_station: st,
+        junction_name: `${st} Area`,
+        latitude: coords[0] + (Math.cos(j + dayNumber) * 0.014),
+        longitude: coords[1] + (Math.sin(j + dayNumber) * 0.014),
+        severity_score: 0.0,
+        vehicle_type: j % 2 === 0 ? 'SCOOTER' : 'CAR',
+        action: 'REJECT',
+        confidence: +(0.93 + (j * 0.01)).toFixed(2),
+        auto_execute: true,
+        status: 'REJECTED',
+        is_rejected: true,
+        reasoning: rejectReasons[j % rejectReasons.length],
+        tool_calls_executed: [
+          { tool: 'validate_parking_rules', result: { is_valid_complaint: false, policy_check: 'EXEMPT_OR_NON_OBSTRUCTING' } },
+          { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: false } }
+        ]
+      })
+    }
+
     return dayItems
   }
 }

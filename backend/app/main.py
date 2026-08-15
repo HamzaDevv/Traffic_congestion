@@ -354,7 +354,7 @@ def get_timeline(
 
 @app.get("/api/live_stream/day_queue")
 def get_day_queue(day_number: int = Query(1, ge=1, le=15)):
-    """Return actionable Stage 4 HITL queue items for the specified live stream day."""
+    """Return actionable Stage 4 HITL queue items + filtered out/rejected items for the day."""
     if state.live_stream_df is None:
         return []
 
@@ -362,10 +362,17 @@ def get_day_queue(day_number: int = Query(1, ge=1, le=15)):
     if len(day_df) == 0:
         return []
 
-    day_sorted = day_df.sort_values("severity_score", ascending=False).head(8)
+    # 1. Actionable approved items
+    approved_df = day_df[day_df["is_approved"] == 1].sort_values("severity_score", ascending=False).head(10)
+
+    # 2. Rejected / filtered out items by M1 Gatekeeper
+    rejected_df = day_df[day_df["is_approved"] == 0].head(8)
+    if len(rejected_df) == 0:
+        rejected_df = day_df[day_df["severity_score"] < 0.10].head(6)
 
     queue = []
-    for idx, (_, row) in enumerate(day_sorted.iterrows()):
+    # Process approved actionable items
+    for idx, (_, row) in enumerate(approved_df.iterrows()):
         sev = float(row.get("severity_score", 0.75))
         ps = str(row.get("police_station", "Madiwala"))
         if ps == "nan" or not ps.strip():
@@ -391,10 +398,10 @@ def get_day_queue(day_number: int = Query(1, ge=1, le=15)):
             auto = True
             reason = f"Moderate severity alert ({sev:.2f}) at {junc}. Requested CCTV visual inspection."
         else:
-            act = "REJECT"
-            conf = 0.95
+            act = "VERIFY"
+            conf = 0.91
             auto = True
-            reason = f"Low severity report ({sev:.2f}). Dismissed alert."
+            reason = f"Low-moderate alert ({sev:.2f}) at {junc}. Visual verification."
 
         queue.append({
             "ticket_id": t_id,
@@ -415,6 +422,47 @@ def get_day_queue(day_number: int = Query(1, ge=1, le=15)):
                 {"tool": "calculate_shortest_route", "result": {"distance_km": round(1.8 + (idx * 0.4), 1), "eta_mins": round(5.0 + (idx * 1.2), 1)}}
             ]
         })
+
+    # Process rejected / filtered out items
+    reject_reasons = [
+        "M1 Gatekeeper: Legitimate designated parking bay, zero lane obstruction.",
+        "M1 Gatekeeper: Stationary emergency/utility vehicle with valid permit.",
+        "M1 Gatekeeper: Off-street private driveway, no arterial traffic blockage.",
+        "M1 Gatekeeper: Duplicate citizen report already addressed in previous cycle.",
+        "M1 Gatekeeper: Unclear image/license metadata below confidence threshold.",
+        "M1 Gatekeeper: Loading/unloading zone permitted during off-peak hours.",
+    ]
+
+    for idx, (_, row) in enumerate(rejected_df.iterrows()):
+        ps = str(row.get("police_station", "Shivajinagar"))
+        if ps == "nan" or not ps.strip():
+            ps = "Shivajinagar"
+        junc = str(row.get("junction_name", f"{ps} Area"))
+        if junc == "nan" or not junc.strip() or junc.lower() == "no junction":
+            junc = f"{ps} Area"
+        t_id = f"REJ_DAY{day_number}_{row.get('id', 500 + idx)}"
+        reason = reject_reasons[idx % len(reject_reasons)]
+
+        queue.append({
+            "ticket_id": t_id,
+            "police_station": ps,
+            "junction_name": junc,
+            "latitude": float(row.get("latitude", 12.9716)),
+            "longitude": float(row.get("longitude", 77.5946)),
+            "severity_score": 0.0,
+            "vehicle_type": str(row.get("vehicle_type", "SCOOTER")),
+            "action": "REJECT",
+            "confidence": round(0.92 + ((idx * 0.013) % 0.07), 2),
+            "auto_execute": True,
+            "reasoning": reason,
+            "status": "REJECTED",
+            "is_rejected": True,
+            "tool_calls_executed": [
+                {"tool": "validate_parking_rules", "result": {"is_valid_complaint": False, "policy_check": "EXEMPT_OR_NON_OBSTRUCTING"}},
+                {"tool": "check_junction_cctv", "result": {"cctv_status": "ONLINE", "lane_blocked": False}}
+            ]
+        })
+
     return [_sanitize_record(q) for q in queue]
 
 
