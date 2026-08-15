@@ -77,12 +77,48 @@ export const fetchStats = (params = {}) =>
 export const fetchTimeline = (params = {}) =>
   withFallback(api.get('/api/timeline', { params }), '/fallback/timeline.json')
 
+let _mockStreamIndex = 0
+let _mockStreamRunning = true
+let _mockStreamSpeed = 10
+const TOTAL_MOCK_COMPLAINTS = 514
+const BASE_MOCK_START = new Date('2024-03-24T08:14:46Z').getTime()
+const BASE_MOCK_END = new Date('2024-04-08T08:14:46Z').getTime()
+
 export const fetchDayQueue = async (dayNumber = 1) => {
   try {
     const res = await api.get('/api/live_stream/day_queue', { params: { day_number: dayNumber } })
     return res.data
   } catch (err) {
-    return []
+    const sampleStations = ['Shivajinagar', 'Upparpet', 'Malleshwaram', 'Cubbon Park', 'Madiwala', 'Indiranagar', 'Bellandur']
+    const dayItems = []
+    const count = 4 + (dayNumber % 3)
+    for (let i = 0; i < count; i++) {
+      const st = sampleStations[(dayNumber + i) % sampleStations.length]
+      const coords = STATION_COORDS[st] || [12.9716, 77.5946]
+      const sev = +(0.45 + ((i * 0.13 + dayNumber * 0.04) % 0.5)).toFixed(2)
+      const isEscalate = sev >= 0.85
+      const act = isEscalate ? 'ESCALATE' : sev >= 0.55 ? 'DISPATCH' : 'VERIFY'
+
+      dayItems.push({
+        ticket_id: `DAY${dayNumber}_INC_${100 + i}`,
+        police_station: st,
+        junction_name: `${st} Junction Corridor`,
+        latitude: coords[0] + (Math.sin(i + dayNumber) * 0.012),
+        longitude: coords[1] + (Math.cos(i + dayNumber) * 0.012),
+        severity_score: sev,
+        action: act,
+        confidence: isEscalate ? 0.76 : 0.92,
+        auto_execute: !isEscalate,
+        status: isEscalate ? 'PENDING' : 'AUTONOMOUS',
+        reasoning: `Day ${dayNumber} violation at ${st} (severity ${(sev * 100).toFixed(0)}%). Qwen 2.5 SOP policy evaluation.`,
+        tool_calls_executed: [
+          { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: sev >= 0.5 } },
+          { tool: 'query_available_units', result: { police_station: st, available_units_count: 2 } },
+          { tool: 'calculate_shortest_route', result: { distance_km: (1.8 + i * 0.5).toFixed(1), eta_mins: (5 + i * 1.5).toFixed(1) } }
+        ]
+      })
+    }
+    return dayItems
   }
 }
 
@@ -154,14 +190,19 @@ export const fetchLiveStreamStatus = async () => {
     const res = await api.get('/api/live_stream/status')
     return res.data
   } catch (err) {
+    const idx = _mockStreamIndex % TOTAL_MOCK_COMPLAINTS
+    const progress_pct = Number(((idx / TOTAL_MOCK_COMPLAINTS) * 100).toFixed(1))
+    const day_number = Math.min(15, Math.max(1, Math.floor((idx / TOTAL_MOCK_COMPLAINTS) * 15) + 1))
+    const simulated_now = new Date(BASE_MOCK_START + (idx / TOTAL_MOCK_COMPLAINTS) * (BASE_MOCK_END - BASE_MOCK_START)).toISOString()
+
     return {
-      running: true,
-      speed: 10,
-      index: 12,
-      total_complaints: 450,
-      day_number: 3,
-      progress_pct: 8.5,
-      simulated_now: new Date().toISOString(),
+      running: _mockStreamRunning,
+      speed: _mockStreamSpeed,
+      index: idx,
+      total_complaints: TOTAL_MOCK_COMPLAINTS,
+      day_number: day_number,
+      progress_pct: progress_pct,
+      simulated_now: simulated_now,
       current_item: null
     }
   }
@@ -172,7 +213,27 @@ export const controlLiveStream = async (payload) => {
     const res = await api.post('/api/live_stream/control', payload)
     return res.data
   } catch (err) {
-    return { running: payload.action === 'play', speed: payload.speed || 10, index: payload.action === 'reset' ? 0 : 13 }
+    if (payload.action === 'play') _mockStreamRunning = true
+    if (payload.action === 'pause') _mockStreamRunning = false
+    if (payload.action === 'reset') _mockStreamIndex = 0
+    if (payload.action === 'next_step') _mockStreamIndex = (_mockStreamIndex + 1) % TOTAL_MOCK_COMPLAINTS
+    if (payload.speed !== undefined) _mockStreamSpeed = Number(payload.speed)
+
+    const idx = _mockStreamIndex % TOTAL_MOCK_COMPLAINTS
+    const progress_pct = Number(((idx / TOTAL_MOCK_COMPLAINTS) * 100).toFixed(1))
+    const day_number = Math.min(15, Math.max(1, Math.floor((idx / TOTAL_MOCK_COMPLAINTS) * 15) + 1))
+    const simulated_now = new Date(BASE_MOCK_START + (idx / TOTAL_MOCK_COMPLAINTS) * (BASE_MOCK_END - BASE_MOCK_START)).toISOString()
+
+    return {
+      running: _mockStreamRunning,
+      speed: _mockStreamSpeed,
+      index: idx,
+      total_complaints: TOTAL_MOCK_COMPLAINTS,
+      day_number: day_number,
+      progress_pct: progress_pct,
+      simulated_now: simulated_now,
+      current_item: null
+    }
   }
 }
 
