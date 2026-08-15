@@ -331,7 +331,15 @@ def load_and_process():
 
         live_df = scored[mask_15d].copy()
         live_df["created_datetime"] = parsed_dates[mask_15d].astype(str)
-        live_df = live_df.sort_values("created_datetime").reset_index(drop=True)
+        live_df["dt"] = parsed_dates[mask_15d]
+        live_df = live_df.sort_values("dt").reset_index(drop=True)
+
+        # Assign 1 to 15 day index
+        live_df["day_number"] = (
+            (live_df["dt"] - cutoff_dt).dt.total_seconds() / (15 * 86400) * 15
+        ).astype(int) + 1
+        live_df["day_number"] = live_df["day_number"].clip(1, 15)
+        live_df = live_df.drop(columns=["dt"])
 
         state.live_stream_df = live_df
         state.live_stream_records = live_df.to_dict(orient="records")
@@ -339,7 +347,7 @@ def load_and_process():
         state.live_stream_start_dt = str(cutoff_dt)
         state.live_stream_end_dt = str(max_dt)
         state.live_stream_simulated_now = str(cutoff_dt)
-        logger.info(f"Loaded {len(state.live_stream_records)} complaints for 15-day live stream ({cutoff_dt} to {max_dt})")
+        logger.info(f"Loaded {len(state.live_stream_records)} complaints for 15-day live stream ({cutoff_dt} to {max_dt}) across 15 days")
     except Exception as e:
         logger.error(f"Failed to prepare 15-day live stream: {e}")
         state.live_stream_records = []

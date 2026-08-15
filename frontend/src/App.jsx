@@ -8,7 +8,18 @@ import ToolExecutionLog from './components/ToolExecutionLog'
 import LiveStreamBar from './components/LiveStreamBar'
 import HistoricalFilterPanel from './components/HistoricalFilterPanel'
 import { useData } from './hooks/useData'
-import { predictAction, postHumanFeedback, fetchRlMetrics, STATION_COORDS, generateDijkstraWaypoints, fetchLiveStreamStatus, controlLiveStream, triggerInstantLiveQuery } from './api'
+import {
+  predictAction,
+  postHumanFeedback,
+  postBatchHumanFeedback,
+  fetchRlMetrics,
+  STATION_COORDS,
+  generateDijkstraWaypoints,
+  fetchLiveStreamStatus,
+  controlLiveStream,
+  triggerInstantLiveQuery,
+  fetchDayQueue,
+} from './api'
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
@@ -162,12 +173,34 @@ export default function App() {
   })
   const [isProcessingInstant, setIsProcessingInstant] = useState(false)
 
-  const { reports, heatmap, clusters, stats, timeline, loading, error } = useData(historicalFilters)
+  const { reports, heatmap, clusters, stats, timeline, loading, error } = useData({
+    filters: historicalFilters,
+    viewMode,
+    dayNumber: streamStatus.day_number || 1,
+    cascadeStage,
+  })
 
   useEffect(() => {
     fetchRlMetrics().then(data => setRlMetrics(data)).catch(() => {})
     fetchLiveStreamStatus().then(st => setStreamStatus(st)).catch(() => {})
   }, [])
+
+  // Sync HITL Queue with active Day's high-severity actionable incidents
+  useEffect(() => {
+    if (viewMode === 'LIVE') {
+      const activeDay = streamStatus.day_number || 1
+      fetchDayQueue(activeDay).then(dayItems => {
+        if (dayItems && dayItems.length > 0) {
+          setQueueItems(prev => {
+            const liveSimItems = prev.filter(i => i.ticket_id.startsWith('LIVE_') || i.ticket_id.startsWith('SIM_'))
+            const existingIds = new Set(liveSimItems.map(i => i.ticket_id))
+            const newDayItems = dayItems.filter(i => !existingIds.has(i.ticket_id))
+            return [...liveSimItems, ...newDayItems]
+          })
+        }
+      }).catch(() => {})
+    }
+  }, [viewMode, streamStatus.day_number])
 
   // Stream tick interval scales according to speed multiplier
   useEffect(() => {
@@ -200,36 +233,6 @@ export default function App() {
     const nextSt = await controlLiveStream({ speed: newSpeed })
     setStreamStatus(nextSt)
   }, [])
-
-  // Auto-seed initial queue items from fetched DBSCAN clusters if available
-  useEffect(() => {
-    if (clusters && clusters.length > 0) {
-      const clusterItems = clusters.slice(0, 4).map((c, idx) => ({
-        ticket_id: `CLUST_${c.cluster_id}`,
-        police_station: c.top_station || 'Madiwala',
-        junction_name: `${c.top_station || 'Madiwala'} Junction`,
-        latitude: c.latitude,
-        longitude: c.longitude,
-        severity_score: c.avg_severity || 0.75,
-        action: c.avg_severity >= 0.85 ? 'ESCALATE' : c.avg_severity >= 0.55 ? 'DISPATCH' : 'VERIFY',
-        confidence: c.avg_severity >= 0.85 ? 0.76 : 0.91,
-        auto_execute: c.avg_severity < 0.85,
-        reasoning: `DBSCAN Hotspot #${idx + 1} (${c.count} violations, radius ${c.radius_m.toFixed(0)}m). Qwen SOP evaluation.`,
-        status: c.avg_severity >= 0.85 ? 'PENDING' : 'AUTONOMOUS',
-        tool_calls_executed: [
-          { tool: 'check_junction_cctv', result: { cctv_status: 'ONLINE', lane_blocked: c.avg_severity > 0.6 } },
-          { tool: 'calculate_shortest_route', result: { distance_km: (2 + idx * 0.7).toFixed(1), eta_mins: (6 + idx * 2).toFixed(1), path: [c.top_station || 'Madiwala', 'Silk Board'] } }
-        ]
-      }))
-
-      // Merge unique items into queue
-      setQueueItems(prev => {
-        const existingIds = new Set(prev.map(i => i.ticket_id))
-        const newItems = clusterItems.filter(i => !existingIds.has(i.ticket_id))
-        return [...prev, ...newItems]
-      })
-    }
-  }, [clusters])
 
   // Continuous animation loop for active tow trucks moving along Dijkstra waypoints
   useEffect(() => {
@@ -486,6 +489,40 @@ export default function App() {
     setRlMetrics(updatedMetrics)
   }
 
+  // 1-Click Fix All / Approve All batch handler
+  const handleFixAllPending = useCallback(async () => {
+    const pendingItems = queueItems.filter(i => !i.auto_execute || i.action === 'ESCALATE' || i.status === 'PENDING')
+    if (pendingItems.length === 0) return
+
+    const ticketIds = pendingItems.map(i => i.ticket_id)
+
+    setQueueItems(prev => prev.map(i => {
+      if (ticketIds.includes(i.ticket_id)) {
+        return { ...i, status: 'RESOLVED', auto_execute: true }
+      }
+      return i
+    }))
+
+    pendingItems.forEach(item => {
+      if (item.action === 'DISPATCH' || item.action === 'ESCALATE') {
+        handleDispatchTowTruck(item)
+      }
+    })
+
+    try {
+      await postBatchHumanFeedback({
+        ticket_ids: ticketIds,
+        officer_action: 'DISPATCH',
+        is_approved: true,
+        officer_notes: 'Batch approved via ⚡ Fix All / Approve All'
+      })
+      const updatedMetrics = await fetchRlMetrics()
+      setRlMetrics(updatedMetrics)
+    } catch (err) {
+      console.error('Batch feedback error:', err)
+    }
+  }, [queueItems, handleDispatchTowTruck])
+
   const handleHumanFeedbackSubmit = async (feedbackData) => {
     await postHumanFeedback(feedbackData)
     setQueueItems(prev => prev.map(i => i.ticket_id === feedbackData.ticket_id ? {
@@ -542,6 +579,7 @@ export default function App() {
           onSelectQueueItem={handleSelectQueueItem}
           onApproveAction={handleApproveQueueItem}
           onDispatchTowTruck={handleDispatchTowTruck}
+          onFixAllPending={handleFixAllPending}
           rlMetrics={rlMetrics}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -722,8 +760,8 @@ export default function App() {
               heatmap={heatmap}
               clusters={clusters}
               showHeatmap={viewMode === 'HISTORICAL' && historicalFilters.showHeatmap}
-              showMarkers={viewMode === 'HISTORICAL'}
-              showClusters={viewMode === 'HISTORICAL' && cascadeStage >= 3}
+              showMarkers={viewMode === 'HISTORICAL' || cascadeStage <= 3}
+              showClusters={cascadeStage >= 3}
               cascadeStage={cascadeStage}
               flyToTarget={flyToTarget}
               simulatePin={simulatePin}

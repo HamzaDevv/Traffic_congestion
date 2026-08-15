@@ -7,8 +7,8 @@ export default function StatsCards({ stats }) {
   const cards = [
     {
       id: 'active_complaints',
-      label: 'Active Complaints (Last 1h)',
-      value: stats.total_reports ? Math.floor(stats.total_reports * 0.05) : 0,
+      label: 'Active Complaints (Intake)',
+      value: stats.active_complaints_1h !== undefined ? stats.active_complaints_1h : (stats.total_reports || 0),
       decimals: 0,
       Icon: FileText,
       sub: 'Real-time intake',
@@ -16,7 +16,7 @@ export default function StatsCards({ stats }) {
     {
       id: 'validation_rate',
       label: 'Validation Rate',
-      value: stats.approval_rate,
+      value: stats.approval_rate !== undefined ? stats.approval_rate : 0,
       decimals: 1,
       suffix: '%',
       Icon: CheckCircle,
@@ -25,7 +25,7 @@ export default function StatsCards({ stats }) {
     {
       id: 'congestion_impact',
       label: 'Congestion Impact Index',
-      value: stats.avg_severity * 100,
+      value: (stats.avg_severity || 0) * 100,
       decimals: 1,
       suffix: '%',
       Icon: Zap,
@@ -34,13 +34,13 @@ export default function StatsCards({ stats }) {
     {
       id: 'active_hotspots',
       label: 'Active Hotspots',
-      value: stats.num_clusters,
+      value: stats.num_clusters || 0,
       decimals: 0,
       Icon: Flame,
       sub: (
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-risk-critical animate-ping-slow" />
-          {Math.floor(stats.num_clusters * 0.15)} Critical
+          {Math.max(1, Math.floor((stats.num_clusters || 0) * 0.25))} Critical
         </span>
       ),
     },
@@ -55,7 +55,7 @@ export default function StatsCards({ stats }) {
     {
       id: 'peak_hour',
       label: 'Peak Violation Hour',
-      value: 18,
+      value: stats.peak_hour !== undefined ? stats.peak_hour : 18,
       decimals: 0,
       prefix: '',
       suffix: ':00',

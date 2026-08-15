@@ -60,7 +60,7 @@ function getFilterParams(filters) {
   return params
 }
 
-export function useData(filters = {}) {
+export function useData({ filters = {}, viewMode = 'LIVE', dayNumber = 1, cascadeStage = 4 } = {}) {
   const [reports, setReports] = useState([])
   const [heatmap, setHeatmap] = useState([])
   const [clusters, setClusters] = useState([])
@@ -69,29 +69,53 @@ export function useData(filters = {}) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Fetch static data once
-  useEffect(() => {
-    Promise.all([fetchClusters(), fetchStats(), fetchTimeline()])
-      .then(([c, s, t]) => {
-        setClusters(c)
-        setStats(s)
-        setTimeline(t)
-      })
-      .catch(err => setError(err.message))
-  }, [])
-
-  // Re-fetch filtered data when filter options change
-  const fetchFiltered = useCallback(() => {
+  const fetchData = useCallback(() => {
     setLoading(true)
-    const params = getFilterParams(filters)
+
+    let reportParams = {}
+    let statsParams = {}
+    let clusterParams = {}
+    let timelineParams = {}
+
+    if (viewMode === 'LIVE') {
+      reportParams = {
+        day_number: dayNumber,
+        approved_only: cascadeStage >= 1,
+        limit: 3000,
+      }
+      statsParams = { day_number: dayNumber }
+      clusterParams = { day_number: dayNumber }
+      timelineParams = { day_number: dayNumber }
+    } else {
+      const historicalParams = getFilterParams(filters)
+      reportParams = {
+        ...historicalParams,
+        approved_only: cascadeStage >= 1,
+      }
+      statsParams = historicalParams
+      clusterParams = {
+        start_date: historicalParams.start_date,
+        end_date: historicalParams.end_date,
+      }
+      timelineParams = {
+        start_date: historicalParams.start_date,
+        end_date: historicalParams.end_date,
+      }
+    }
 
     Promise.all([
-      fetchReports(params),
-      fetchHeatmap(params),
+      fetchReports(reportParams),
+      fetchHeatmap(reportParams),
+      fetchClusters(clusterParams),
+      fetchStats(statsParams),
+      fetchTimeline(timelineParams),
     ])
-      .then(([r, h]) => {
-        setReports(r)
-        setHeatmap(h)
+      .then(([r, h, c, s, t]) => {
+        setReports(r || [])
+        setHeatmap(h || [])
+        setClusters(c || [])
+        setStats(s || null)
+        setTimeline(t || [])
         setLoading(false)
         setError(null)
       })
@@ -99,11 +123,11 @@ export function useData(filters = {}) {
         setError(err.message)
         setLoading(false)
       })
-  }, [JSON.stringify(filters)])
+  }, [viewMode, dayNumber, cascadeStage, JSON.stringify(filters)])
 
   useEffect(() => {
-    fetchFiltered()
-  }, [fetchFiltered])
+    fetchData()
+  }, [fetchData])
 
-  return { reports, heatmap, clusters, stats, timeline, loading, error }
+  return { reports, heatmap, clusters, stats, timeline, loading, error, refetch: fetchData }
 }

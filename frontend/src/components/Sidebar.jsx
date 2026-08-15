@@ -47,6 +47,7 @@ export default function Sidebar({
   onApproveAction,
   onOverrideAction,
   onDispatchTowTruck,
+  onFixAllPending,
   rlMetrics = null,
   activeTab,
   setActiveTab
@@ -155,6 +156,7 @@ export default function Sidebar({
             onApproveAction={onApproveAction}
             onOverrideAction={onOverrideAction}
             onDispatchTowTruck={onDispatchTowTruck}
+            onFixAllPending={onFixAllPending}
             rlMetrics={rlMetrics}
           />
         )}

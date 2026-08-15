@@ -68,14 +68,23 @@ export const fetchReports = (params = {}) =>
 export const fetchHeatmap = (params = {}) =>
   withFallback(api.get('/api/heatmap', { params }), '/fallback/heatmap.json')
 
-export const fetchClusters = () =>
-  withFallback(api.get('/api/clusters'), '/fallback/clusters.json')
+export const fetchClusters = (params = {}) =>
+  withFallback(api.get('/api/clusters', { params }), '/fallback/clusters.json')
 
-export const fetchStats = () =>
-  withFallback(api.get('/api/stats'), '/fallback/stats.json')
+export const fetchStats = (params = {}) =>
+  withFallback(api.get('/api/stats', { params }), '/fallback/stats.json')
 
-export const fetchTimeline = () =>
-  withFallback(api.get('/api/timeline'), '/fallback/timeline.json')
+export const fetchTimeline = (params = {}) =>
+  withFallback(api.get('/api/timeline', { params }), '/fallback/timeline.json')
+
+export const fetchDayQueue = async (dayNumber = 1) => {
+  try {
+    const res = await api.get('/api/live_stream/day_queue', { params: { day_number: dayNumber } })
+    return res.data
+  } catch (err) {
+    return []
+  }
+}
 
 export const postSimulate = async (body) => {
   const res = await api.post('/api/simulate', body)
@@ -112,6 +121,15 @@ export const postHumanFeedback = async (body) => {
     return res.data
   } catch (err) {
     return { status: 'logged', feedback_id: `FB-${Date.now()}`, total_feedback_logs: 15 }
+  }
+}
+
+export const postBatchHumanFeedback = async (body) => {
+  try {
+    const res = await api.post('/api/human_feedback_batch', body)
+    return res.data
+  } catch (err) {
+    return { status: 'batch_logged', resolved_count: body.ticket_ids?.length || 1, total_feedback_logs: 20 }
   }
 }
 

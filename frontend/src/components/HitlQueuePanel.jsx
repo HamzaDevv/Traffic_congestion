@@ -7,6 +7,7 @@ export default function HitlQueuePanel({
   onApproveAction,
   onOverrideAction,
   onDispatchTowTruck,
+  onFixAllPending,
   rlMetrics = null
 }) {
   const [filter, setFilter] = useState('ALL') // 'ALL', 'PENDING', 'AUTONOMOUS'
@@ -72,6 +73,18 @@ export default function HitlQueuePanel({
             </div>
           </div>
         </div>
+
+        {/* Fix All / Batch Approve Button */}
+        {pendingCount > 0 && (
+          <button
+            onClick={() => onFixAllPending?.()}
+            className="w-full mt-2.5 py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black border border-amber-300 hover:scale-[1.02] active:scale-95"
+            title="Approve and resolve all pending HITL items in 1 click"
+          >
+            <Zap size={14} className="fill-black" />
+            <span>⚡ Fix All / Approve All ({pendingCount} Pending)</span>
+          </button>
+        )}
 
         {/* DPO Rate info */}
         {rlMetrics && (
